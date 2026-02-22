@@ -1,0 +1,11 @@
+# path: ../datasets/roboflow
+
+train: C:/Users/USER/Downloads/Clean&preprocessing/YOLO/train/images
+val: C:/Users/USER/Downloads/Clean&preprocessing/YOLO/valid/images
+test: C:/Users/USER/Downloads/Clean&preprocessing/YOLO/test/images
+
+nc: 3
+names:
+  0: Impacted_Tooth
+  1: Caries
+  2: Periapical_Lesion

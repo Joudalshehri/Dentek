@@ -1,0 +1,169 @@
+/* Container and Layout */
+.settings-container {
+    min-height: 100vh;
+    padding: 2rem;
+    transition: background-color 0.3s ease;
+}
+
+.settings-container.light { background-color: #D5DDDF; }
+.settings-container.dark { background-color: #1a1f2e; }
+
+.settings-max-width {
+    max-width: 60rem; 
+    margin: 0 auto;
+}
+
+/* Main Card */
+.settings-card {
+    position: relative;
+    border-radius: 2rem;
+    padding: 3rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    transition: background-color 0.3s ease;
+}
+.settings-card.light { background-color: #ffffff; }
+.settings-card.dark { background-color: #1f2937; }
+
+/* ✅ زر الايدت (Top Right) */
+.card-edit-btn {
+    position: absolute;
+    top: 2rem;
+    right: 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+/* لون زر الايدت (درجة الأخضر الداكن) */
+.light .card-edit-btn {
+    background-color: #3d5a54;
+    color: #ffffff;
+}
+
+.dark .card-edit-btn {
+    background-color: #5a8a7a;
+    color: #ffffff;
+}
+
+/* Avatar Section */
+.avatar-row {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+.dark .avatar-row { border-bottom-color: #374151; }
+
+.avatar-circle {
+    width: 6.5rem;
+    height: 6.5rem;
+    border-radius: 50%;
+    background-color: #3d5a54;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.avatar-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #111827;
+}
+.dark .avatar-title { color: #ffffff; }
+
+.btn-change-photo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 0.75rem;
+    background-color: #f3f4f6;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #374151;
+    font-weight: 500;
+}
+
+/* Inputs Grid */
+.inputs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.input-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: #374151;
+}
+.dark .input-label { color: #d1d5db; }
+
+.custom-input {
+    width: 100%;
+    padding: 1rem 1.25rem;
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+    background-color: #ffffff;
+    font-size: 1rem;
+    outline: none;
+}
+.dark .custom-input {
+    background-color: #1f2937;
+    border-color: #4b5563;
+    color: white;
+}
+
+/* ✅ زر الحفظ (Centered & Green) */
+.save-actions-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 3rem;
+}
+
+.btn-full-save {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.8rem 2.5rem;
+    /* استخدام نفس درجة لون زر الايدت */
+    background-color: #3d5a54; 
+    color: white;
+    font-weight: 600;
+    font-size: 1.1rem;
+    border-radius: 1.25rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-full-save:hover {
+    opacity: 0.9;
+    box-shadow: 0 4px 12px rgba(61, 90, 84, 0.3);
+}
+
+.btn-full-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Utility */
+@media (max-width: 768px) {
+    .inputs-grid { grid-template-columns: 1fr; }
+}

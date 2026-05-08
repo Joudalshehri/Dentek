@@ -559,27 +559,69 @@ def list_reports(request):
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def update_report(request, xray_id):
+
+    # Validate xray_id
+    if not isinstance(xray_id, int) or xray_id <= 0:
+        return Response(
+            {"error": "Invalid XRay ID."},
+            status=400
+        )
+
+    # Get the X-ray and make sure it belongs to the logged-in user
     try:
         xray = XRay.objects.select_related("patient").get(
             id=xray_id,
             patient__user=request.user
         )
+
     except XRay.DoesNotExist:
-        return Response({"error": "XRay not found"}, status=404)
+        return Response(
+            {"error": "XRay not found."},
+            status=404
+        )
 
+    # Get doctor notes from request
     doctor_notes = request.data.get("doctor_notes")
-    edited_report = request.data.get("edited_report")
 
-    if doctor_notes is not None:
-        xray.doctor_notes = doctor_notes
+    # Validate doctor_notes existence
+    if doctor_notes is None:
+        return Response(
+            {"error": "Doctor notes are required. Please enter notes before saving."},
+            status=400
+        )
 
-    if edited_report is not None:
-        xray.edited_report = edited_report
+    # Validate doctor_notes type
+    if not isinstance(doctor_notes, str):
+        return Response(
+            {"error": "Doctor notes must be text."},
+            status=400
+        )
 
+    # Remove spaces from beginning and end
+    doctor_notes = doctor_notes.strip()
+
+    # Validate empty notes
+    if doctor_notes == "":
+        return Response(
+            {"error": "Doctor notes cannot be empty."},
+            status=400
+        )
+
+    # Prevent notes that contain only numbers
+    if doctor_notes.isdigit():
+        return Response(
+            {"error": "Doctor notes cannot contain only numbers. Please write a real note."},
+            status=400
+        )
+
+    # Update doctor notes
+    xray.doctor_notes = doctor_notes
+
+    # Save changes
     xray.save()
 
+    # Return success response
     return Response({
-        "message": "Report updated successfully",
+        "message": "Notes updated successfully.",
         "doctor_notes": xray.doctor_notes,
-        "edited_report": xray.edited_report,
-    })
+    }, status=200)

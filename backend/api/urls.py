@@ -7,6 +7,7 @@ from .views import (
     get_patient,
     login_view,
     profile_view,
+    update_profile_view,
     analyze_xray_view,
     get_xray_analysis,
     list_reports,
@@ -26,6 +27,6 @@ urlpatterns = [
     path("xrays/<int:xray_id>/analysis/", get_xray_analysis, name="get_xray_analysis"),
     path("reports/", list_reports, name="list_reports"),
     path("profile/", profile_view, name="profile"),
-    path("profile/update/", profile_view, name="profile_update"),
+path("profile/update/", update_profile_view, name="update_profile"),
     path("xrays/<int:xray_id>/update-report/", update_report, name="update_report"),
 ]

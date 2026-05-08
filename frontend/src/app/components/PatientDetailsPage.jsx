@@ -14,17 +14,20 @@ export function PatientDetailsPage({
 }) {
   const { isDarkMode } = useDarkMode();
 
+  // ===== STATE MANAGEMENT =====
   const [patient, setPatient] = useState(null);
   const [xrays, setXrays] = useState([]);
   const [loading, setLoading] = useState(false);
   const [analyzingXrayId, setAnalyzingXrayId] = useState(null);
 
+  // ===== AUTH TOKEN =====
   const getToken = () => localStorage.getItem("token");
 
   const getAuthHeaders = () => ({
     Authorization: `Token ${getToken()}`,
   });
 
+  // ===== FETCH PATIENT DETAILS =====
   const fetchPatient = async () => {
     try {
       const response = await fetch(
@@ -41,22 +44,28 @@ export function PatientDetailsPage({
 
       const data = await response.json();
 
-      setPatient({
+      // Normalize patient object
+      const formattedPatient = {
         id: String(data.id),
         patient_id: data.patient_id,
         name: data.name,
         age: data.age,
         phone: data.phone,
         email: data.email,
-      });
+      };
 
+      setPatient(formattedPatient);
+
+      // Store selected patient info locally
       localStorage.setItem("selectedPatientName", data.name);
       localStorage.setItem("selectedPatientAge", String(data.age));
+
     } catch (err) {
       console.error("Error fetching patient:", err);
     }
   };
 
+  // ===== FETCH XRAYS LIST =====
   const fetchXrays = async () => {
     try {
       setLoading(true);
@@ -75,6 +84,7 @@ export function PatientDetailsPage({
 
       const data = await response.json();
 
+      // Format API response for UI
       const formatted = data.map((item) => ({
         id: item.id.toString(),
         type: "Panoramic X-Ray",
@@ -84,6 +94,7 @@ export function PatientDetailsPage({
       }));
 
       setXrays(formatted);
+
     } catch (err) {
       console.error("Error fetching xrays:", err);
     } finally {
@@ -91,22 +102,36 @@ export function PatientDetailsPage({
     }
   };
 
+  // ===== INITIAL DATA LOAD =====
   useEffect(() => {
     fetchPatient();
     fetchXrays();
   }, [patientId]);
 
+  // ===== UPLOAD XRAY =====
   const handleUploadXray = async (file) => {
+    const token = getToken();
+
+    if (!token) {
+      console.error("No auth token found");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("patient_id", patientId);
     formData.append("image", file);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/xrays/upload/", {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: formData,
-      });
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/xrays/upload/",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
         console.error("Failed to upload xray:", response.status);
@@ -114,11 +139,13 @@ export function PatientDetailsPage({
       }
 
       await fetchXrays();
+
     } catch (err) {
       console.error("Error uploading xray:", err);
     }
   };
 
+  // ===== ANALYZE XRAY =====
   const handleAnalyzeXray = async (xrayId) => {
     try {
       setAnalyzingXrayId(xrayId);
@@ -138,10 +165,16 @@ export function PatientDetailsPage({
       }
 
       const analysisData = await response.json();
-      localStorage.setItem("latestAnalysis", JSON.stringify(analysisData));
+
+      // Save latest analysis for later use
+      localStorage.setItem(
+        "latestAnalysis",
+        JSON.stringify(analysisData)
+      );
 
       await fetchXrays();
       onAnalyzeXray(xrayId);
+
     } catch (err) {
       console.error("Error analyzing X-ray:", err);
       alert("Error analyzing X-ray");
@@ -150,6 +183,7 @@ export function PatientDetailsPage({
     }
   };
 
+  // ===== FORMAT DATE =====
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "long",
@@ -158,11 +192,14 @@ export function PatientDetailsPage({
     });
   };
 
+  // ===== LOADING STATE =====
   if (!patient) return <div className="loading">Loading...</div>;
 
   return (
     <div className={`page ${isDarkMode ? "dark" : "light"}`}>
       <div className="container">
+
+        {/* Patient Header Section */}
         <PatientDetailsHeader
           isDarkMode={isDarkMode}
           patient={patient}
@@ -170,11 +207,14 @@ export function PatientDetailsPage({
         />
 
         <div className="card">
+
+          {/* XRay Upload Header */}
           <XRayGalleryHeader
             isDarkMode={isDarkMode}
             onUpload={handleUploadXray}
           />
 
+          {/* XRay Grid */}
           {loading ? (
             <div className="loading">Loading X-rays...</div>
           ) : (
@@ -191,6 +231,7 @@ export function PatientDetailsPage({
               ))}
             </div>
           )}
+
         </div>
       </div>
     </div>

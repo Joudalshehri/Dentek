@@ -4,59 +4,93 @@ import "../../styles/PatientDetailsHeader.css";
 
 /**
  * PatientDetailsHeader Component
- * ------------------------------
- * Displays patient overview with refined gray tones.
- * Fragment shorthand <> used for cleaner JSX structure.
+ * --------------------------------
+ * Displays patient profile information:
+ * - Patient name
+ * - Patient ID
+ * - Age
+ * - Contact information
  */
-export function PatientDetailsHeader({ isDarkMode, patient, onBack }) {
-  
+export function PatientDetailsHeader({
+  isDarkMode,
+  patient,
+  onBack,
+}) {
+
+  /**
+   * Prevent component crash while
+   * patient data is still loading
+   */
+  if (!patient) return null;
+
+  // Theme mode (light / dark)
   const theme = isDarkMode ? "dark" : "light";
 
+  /**
+   * Generate avatar initials
+   * Example:
+   * John Doe → JD
+   */
   const avatarInitials = patient.name
-    ? patient.name.split(" ").map((n) => n[0]).join("")
-    : "P";
-
-  const formattedId = "P" + (patient.id ? patient.id.toString().padStart(3, "0") : "000");
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <>
-      {/* Navigation section */}
-      <button onClick={onBack} className={"back-btn " + theme}>
+      {/* Back Navigation Button */}
+      <button
+        type="button"
+        onClick={onBack}
+        className={`back-btn ${theme}`}
+      >
         <ArrowLeft size={20} />
         <span>Back to Patients</span>
       </button>
 
-      {/* Profile Card */}
-      <div className={"patient-card " + theme}>
+      {/* Patient Profile Card */}
+      <div className={`patient-card ${theme}`}>
         <div className="patient-flex-container">
-          
+
+          {/* Avatar Section */}
           <div className="patient-avatar">
             {avatarInitials}
           </div>
 
+          {/* Patient Information */}
           <div className="patient-info-body">
-            
-            <h1 className={"patient-title " + theme}>
+
+            {/* Patient Name */}
+            <h1 className={`patient-title ${theme}`}>
               {patient.name}
             </h1>
-            
-            <p className={"patient-id-text " + theme}>
-              Patient ID: {formattedId}
+
+            {/* Patient ID */}
+            <p className={`patient-id-text ${theme}`}>
+              Patient ID: {patient.patient_id}
             </p>
 
-            <div className={"metadata-grid " + theme}>
-              
-              <div className={"metadata-item " + theme}>
+            {/* Patient Metadata */}
+            <div className={`metadata-grid ${theme}`}>
+
+              {/* Age */}
+              <div className={`metadata-item ${theme}`}>
                 <User size={16} />
-                <span>{patient.age} years {patient.gender}</span>
+                <span>
+                  {patient.age} years
+                </span>
               </div>
 
-              <div className={"metadata-item " + theme}>
+              {/* Phone Number */}
+              <div className={`metadata-item ${theme}`}>
                 <Phone size={16} />
                 <span>{patient.phone}</span>
               </div>
 
-              <div className={"metadata-item " + theme}>
+              {/* Email Address */}
+              <div className={`metadata-item ${theme}`}>
                 <Mail size={16} />
                 <span>{patient.email}</span>
               </div>

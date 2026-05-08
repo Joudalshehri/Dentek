@@ -1,0 +1,27 @@
+/* PatientsPage.css */
+
+/* Main layout container with full height and smooth theme transition */
+.patients-page-container {
+    min-height: 100vh;
+    padding: 2rem;
+    transition: background-color 0.3s ease;
+}
+
+/* Light Mode Background */
+.patients-page-container.light {
+    background-color: #D5DDDF;
+}
+
+/* Dark Mode Background */
+.patients-page-container.dark {
+    background-color: #1a1f2e;
+}
+
+/* Centered content wrapper with max-width and vertical spacing */
+.patients-content-wrapper {
+    max-width: 80rem; /* 7xl equivalent */
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem; /* Matches space-y-6 */
+}

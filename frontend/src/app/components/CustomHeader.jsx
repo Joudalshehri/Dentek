@@ -1,45 +1,68 @@
 import React from "react";
-import { Plus, Loader2 } from "lucide-react"; 
-import "../../styles/PatientsHeader.css"; 
+import { Plus, Loader2 } from "lucide-react";
+
+import "../../styles/PatientsHeader.css";
 
 /**
- * CustomHeader Component (Unified & Reusable)
- * Supports dynamic titles, optional action buttons, and loading states.
+ * Reusable page header component
+ *
+ * Features:
+ * - Dynamic title and subtitle
+ * - Optional action button
+ * - Loading state support
+ * - Customizable icon
  */
-export function CustomHeader({ 
-  isDarkMode, 
-  title, 
-  subtitle, 
-  onBtnClick = () => {}, // Default empty function to satisfy TypeScript
-  btnText = "",          // Default empty string to satisfy TypeScript
-  showBtn = false, 
-  isLoading = false, 
-  icon: Icon = Plus      // Default icon is Plus, can be overridden (e.g., Save)
+
+export function CustomHeader({
+  isDarkMode,
+  title,
+  subtitle,
+
+  // Button settings
+  onBtnClick,
+  btnText = "",
+  showBtn = false,
+
+  // Loading state
+  isLoading = false,
+
+  // Default icon
+  icon: Icon = Plus,
 }) {
+
+  // Apply current theme class
   const themeClass = isDarkMode ? "dark" : "light";
 
   return (
     <div className="patients-header-container">
-      {/* Text Section */}
+
+      {/* Header text section */}
       <div className={`header-text-group ${themeClass}`}>
         <h1>{title}</h1>
         <p>{subtitle}</p>
       </div>
 
-      {/* Action Button Section */}
+      {/* Optional action button */}
       {showBtn && (
-        <button 
-          onClick={onBtnClick} 
-          className={`add-patient-btn ${themeClass}`} 
+        <button
+          onClick={onBtnClick}
+          className={`add-patient-btn ${themeClass}`}
           disabled={isLoading}
           aria-label={btnText}
         >
+
+          {/* Display loading spinner while processing */}
           {isLoading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
             <Icon className="w-5 h-5" />
           )}
-          <span>{isLoading ? "Saving..." : btnText}</span>
+
+          {/* Button label */}
+          <span>
+            {isLoading ? "Saving..." : btnText}
+          </span>
+
         </button>
       )}
     </div>

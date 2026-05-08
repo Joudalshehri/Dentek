@@ -89,7 +89,9 @@ class PatientTests(APITestCase):
         }, format="json")
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("error", response.data)
+        self.assertIn("patient_id", response.data)
+        self.assertEqual(
+        response.data["patient_id"],"Patient ID already exists.")
 
     def test_list_patients(self):
         Patient.objects.create(

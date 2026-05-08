@@ -246,23 +246,30 @@ def login_view(request):
     )
 
 
-@api_view(["GET", "PUT"])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
     user = request.user
 
-    if request.method == "GET":
-        return Response({
-            "username": user.username,
-            "email": user.email,
-        })
+    return Response({
+        "username": user.username,
+        "email": user.email,
+    })
 
-    if request.method == "PUT":
-        user.username = request.data.get("username", user.username)
-        user.email = request.data.get("email", user.email)
-        user.save()
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def update_profile_view(request):
+    user = request.user
 
-        return Response({"message": "Updated successfully"})
+    user.username = request.data.get("username", user.username)
+    user.email = request.data.get("email", user.email)
+    user.save()
+
+    return Response({
+        "message": "Updated successfully",
+        "username": user.username,
+        "email": user.email,
+    })
 
 
 @api_view(["POST"])
@@ -277,7 +284,7 @@ def create_patient(request):
         return Response({"error": "patient_id is required"}, status=400)
 
     if Patient.objects.filter(patient_id=patient_code).exists():
-        return Response({"error": "Patient ID already exists"}, status=400)
+        return Response({"patient_id": "Patient ID already exists."}, status=400)
 
     patient = Patient.objects.create(
         user=request.user,
@@ -298,12 +305,17 @@ def create_patient(request):
     )
 
 
+# GET: Retrieve all patients for the logged-in user
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_patients(request):
-    patients = Patient.objects.filter(user=request.user).order_by("-id")
+
+    patients = Patient.objects.filter(
+        user=request.user
+    ).order_by("-id")
 
     data = []
+
     for p in patients:
         data.append({
             "id": p.id,
@@ -318,14 +330,23 @@ def list_patients(request):
     return Response(data)
 
 
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_patient(request, patient_id):
+    """
+    Get a specific patient that belongs to the authenticated user.
+    """
+
     try:
+        # Get patient by ID and make sure it belongs to the current user
         patient = Patient.objects.get(id=patient_id, user=request.user)
+
     except Patient.DoesNotExist:
+        # Return 404 if patient does not exist or does not belong to user
         return Response({"error": "Patient not found"}, status=404)
 
+    # Return patient details to the frontend
     return Response({
         "id": patient.id,
         "patient_id": patient.patient_id,
@@ -340,25 +361,36 @@ def get_patient(request, patient_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def upload_xray(request):
+    """
+    Upload a new X-ray image for a specific patient.
+    """
+
+    # Get patient ID and uploaded image from the request
     patient_id = request.data.get("patient_id")
     image = request.FILES.get("image")
 
+    # Validate that patient_id is provided
     if not patient_id:
         return Response({"error": "patient_id is required"}, status=400)
 
+    # Validate that image file is provided
     if not image:
         return Response({"error": "image is required"}, status=400)
 
     try:
+        # Make sure the patient exists and belongs to the current user
         patient = Patient.objects.get(id=patient_id, user=request.user)
+
     except Patient.DoesNotExist:
         return Response({"error": "Patient not found"}, status=404)
 
+    # Create new X-ray record linked to the patient
     xray = XRay.objects.create(
         patient=patient,
         image=image
     )
 
+    # Return uploaded X-ray information
     return Response(
         {
             "id": xray.id,
@@ -373,19 +405,30 @@ def upload_xray(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_xrays(request):
+    """
+    List all X-rays for a specific patient.
+    """
+
+    # Get patient ID from query parameters
     patient_id = request.GET.get("patient_id")
 
+    # Validate that patient_id is provided
     if not patient_id:
         return Response({"error": "patient_id is required"}, status=400)
 
     try:
+        # Make sure the patient belongs to the authenticated user
         patient = Patient.objects.get(id=patient_id, user=request.user)
+
     except Patient.DoesNotExist:
         return Response({"error": "Patient not found"}, status=404)
 
+    # Get patient's X-rays, newest first
     xrays = XRay.objects.filter(patient=patient).order_by("-created_at")
 
     data = []
+
+    # Format X-ray data for frontend
     for x in xrays:
         data.append({
             "id": x.id,
@@ -400,27 +443,38 @@ def list_xrays(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def analyze_xray_view(request, xray_id):
+    """
+    Run AI analysis on a selected X-ray image.
+    """
+
     try:
+        # Get X-ray and its patient, ensuring ownership by current user
         xray = XRay.objects.select_related("patient").get(
             id=xray_id,
             patient__user=request.user
         )
+
     except XRay.DoesNotExist:
         return Response({"error": "XRay not found"}, status=404)
 
+    # Validate that the X-ray has an image field
     if not xray.image:
         return Response({"error": "No image found for this XRay"}, status=400)
 
+    # Validate that the image file exists on the server
     if not os.path.exists(xray.image.path):
         return Response({"error": "XRay image file does not exist"}, status=404)
 
+    # Run the full AI analysis pipeline
     result = run_full_analysis(xray.image.path)
 
+    # Extract analysis sections safely
     report = result.get("report", {})
     findings = result.get("findings", [])
     impacted_findings = result.get("impacted_findings", [])
     lesion_findings = result.get("lesion_findings", result.get("findings", []))
 
+    # Generate recommendation based on AI findings
     recommendation = generate_dental_recommendation(
         report=report,
         findings=findings,
@@ -428,21 +482,23 @@ def analyze_xray_view(request, xray_id):
         lesion_findings=lesion_findings,
     )
 
-    xray.analysis_result = ( 
-   AnalysisResultBuilder(xray) 
-   .add_basic_info() 
-   .add_report(report) 
-   .add_findings(findings) 
-   .add_impacted_findings(impacted_findings) 
-   .add_lesion_findings(lesion_findings) 
-   .add_recommendation(recommendation) 
-   .build() 
-)
+    # Build final structured analysis result
+    xray.analysis_result = (
+        AnalysisResultBuilder(xray)
+        .add_basic_info()
+        .add_report(report)
+        .add_findings(findings)
+        .add_impacted_findings(impacted_findings)
+        .add_lesion_findings(lesion_findings)
+        .add_recommendation(recommendation)
+        .build()
+    )
 
+    # Save analysis result in database
     xray.save()
 
+    # Return final analysis result to frontend
     return Response(xray.analysis_result, status=200)
-
 
 
 @api_view(["GET"])

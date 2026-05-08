@@ -1,26 +1,45 @@
 import React from "react";
-import { Phone, Mail, ChevronRight } from "lucide-react";
+import {
+  Phone,
+  Mail,
+  ChevronRight,
+} from "lucide-react";
+
 import "../../styles/PatientsTable.css";
 
 /**
  * PatientsTable Component
- * Renders a stylized table of patient records with theme support and selection handling.
- * * @param {boolean} isDarkMode - Current theme state to apply dark/light styles.
- * @param {Array} patients - List of patient objects to be displayed.
- * @param {function} onSelectPatient - Callback function triggered when a row is clicked.
+ *
+ * Displays patient records in a table with:
+ * - System ID
+ * - National ID
+ * - Name
+ * - Age
+ * - Contact information
+ * - Clickable patient rows
  */
+
 export function PatientsTable({
   isDarkMode,
   patients,
   onSelectPatient,
 }) {
+
+  // Apply dark mode class
+  const theme = isDarkMode ? "dark" : "";
+
   return (
-    <div className={`patients-table ${isDarkMode ? "dark" : ""}`}>
+    <div className={`patients-table ${theme}`}>
+
       <div className="table-wrapper">
+
         <table>
+
+          {/* Table header */}
           <thead>
             <tr>
-              <th>Patient ID</th>
+              <th>System ID</th>
+              <th>National ID</th>
               <th>Name</th>
               <th>Age</th>
               <th>Contact</th>
@@ -28,64 +47,101 @@ export function PatientsTable({
             </tr>
           </thead>
 
+          {/* Table body */}
           <tbody>
-            {/* Map through the patients array to generate table rows */}
+
             {patients.map((patient) => (
+
               <tr
                 key={patient.id}
-                onClick={() => onSelectPatient(patient.id)}
+                onClick={() =>
+                  onSelectPatient(patient.id)
+                }
                 className="row"
               >
-                {/* Format ID to always show 3 digits (e.g., P001) */}
+
+                {/* Internal system ID */}
                 <td className="id">
-                  {`P${patient.id.toString().padStart(3, "0")}`}
+                  {`P${patient.id
+                    .toString()
+                    .padStart(3, "0")}`}
                 </td>
 
+                {/* Patient national ID */}
                 <td>
+                  {patient.patient_id}
+                </td>
+
+                {/* Patient name and avatar */}
+                <td>
+
                   <div className="name-cell">
-                    {/* Generate Avatar initials from the first letter of each name part */}
+
+                    {/* Initials avatar */}
                     <div className="avatar">
                       {patient.name
                         .split(" ")
                         .map((n) => n[0])
                         .join("")}
                     </div>
-                    <span>{patient.name}</span>
+
+                    {/* Full patient name */}
+                    <span>
+                      {patient.name}
+                    </span>
+
                   </div>
+
                 </td>
 
-                <td>{patient.age}</td>
-
+                {/* Patient age */}
                 <td>
-                  {/* Contact Info: Displays Phone and Email with corresponding icons */}
+                  {patient.age}
+                </td>
+
+                {/* Contact information */}
+                <td>
+
                   <div className="contact">
+
+                    {/* Phone number */}
                     <div>
                       <Phone className="icon" />
                       {patient.phone}
                     </div>
+
+                    {/* Email address */}
                     <div>
                       <Mail className="icon" />
                       {patient.email}
                     </div>
+
                   </div>
+
                 </td>
 
-                {/* Navigation indicator for row clickability */}
+                {/* Navigation arrow */}
                 <td className="arrow">
                   <ChevronRight className="arrow-icon" />
                 </td>
+
               </tr>
+
             ))}
+
           </tbody>
+
         </table>
+
       </div>
 
-      {/* Conditional Rendering: Show message if no data matches the filter */}
+      {/* Empty state message */}
       {patients.length === 0 && (
         <div className="empty">
           No patients found matching your search.
         </div>
       )}
+
     </div>
   );
 }

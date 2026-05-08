@@ -1,4 +1,5 @@
 import { Plus, X } from "lucide-react";
+
 import "../../styles/AddPatientModal.css";
 
 export function AddPatientModal({
@@ -6,6 +7,7 @@ export function AddPatientModal({
   isDarkMode,
   newPatient,
   setNewPatient,
+  errors = {},
   onClose,
   onSubmit,
 }) {
@@ -16,9 +18,9 @@ export function AddPatientModal({
   const fields = [
     {
       id: "patient_id",
-      label: "Patient ID",
+      label: "National ID",
       type: "text",
-      placeholder: "Enter patient ID",
+      placeholder: "10-digit ID",
     },
     {
       id: "name",
@@ -30,7 +32,6 @@ export function AddPatientModal({
       id: "birthDate",
       label: "Date of Birth",
       type: "date",
-      placeholder: "",
     },
     {
       id: "phone",
@@ -47,7 +48,10 @@ export function AddPatientModal({
   ];
 
   return (
-    <div className={`modal-overlay ${themeClass}`} onClick={onClose}>
+    <div
+      className={`modal-overlay ${themeClass}`}
+      onClick={onClose}
+    >
       <div
         className={`modal-content ${themeClass}`}
         onClick={(e) => e.stopPropagation()}
@@ -65,33 +69,46 @@ export function AddPatientModal({
           </button>
         </div>
 
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} noValidate>
+          {errors.form && (
+            <p className="form-error">
+              {errors.form}
+            </p>
+          )}
+
           {fields.map((field) => (
-            <div key={field.id} className="form-group">
-              <label htmlFor={field.id} className={themeClass}>
+            <div
+              key={field.id}
+              className="form-group"
+            >
+              <label
+                htmlFor={field.id}
+                className={themeClass}
+              >
                 {field.label}
               </label>
 
               <input
                 id={field.id}
                 type={field.type}
-                required
-                placeholder={field.placeholder}
-                value={newPatient[field.id] || ""}
-                pattern={field.id === "phone" ? "05[0-9]{8}" : undefined}
-                title={
-                  field.id === "phone"
-                    ? "Phone number must start with 05 and be 10 digits"
-                    : undefined
-                }
+                placeholder={field.placeholder || ""}
+                value={String(newPatient[field.id] || "")}
                 onChange={(e) =>
                   setNewPatient({
                     ...newPatient,
                     [field.id]: e.target.value,
                   })
                 }
-                className={`input-field ${themeClass}`}
+                className={`input-field ${themeClass} ${
+                  errors[field.id] ? "input-error" : ""
+                }`}
               />
+
+              {errors[field.id] && (
+                <p className="field-error">
+                  {errors[field.id]}
+                </p>
+              )}
             </div>
           ))}
 
@@ -104,7 +121,10 @@ export function AddPatientModal({
               Cancel
             </button>
 
-            <button type="submit" className="btn btn-submit">
+            <button
+              type="submit"
+              className="btn btn-submit"
+            >
               <Plus size={20} />
               Add Patient
             </button>

@@ -1,10 +1,16 @@
 import React from "react";
 import { Sparkles, Loader2, CheckCircle2, Eye } from "lucide-react";
 import "../../styles/XRayCard.css";
+
 /**
  * XRayCard Component
  * ------------------
- * A specialized UI component designed to display dental X-ray images.
+ * Displays one dental X-ray image with:
+ * - Image preview
+ * - X-ray type
+ * - Upload date
+ * - Analysis status
+ * - Analyze / Show Report button
  */
 export function XRayCard({
   isDarkMode,
@@ -13,25 +19,37 @@ export function XRayCard({
   onAnalyze,
   isAnalyzing = false,
 }) {
+  // Prevent component crash if xray data is not loaded yet
+  if (!xray) return null;
+
+  // Theme mode
+  const theme = isDarkMode ? "dark" : "light";
+
+  // Fallback values
+  const xrayType = xray.type || "Dental X-Ray";
+  const xrayImage = xray.thumbnail || xray.image;
+  const xrayDate = xray.date ? formatDate(xray.date) : "No date available";
+
   return (
-    <div className={`xray-card ${isDarkMode ? "dark" : "light"}`}>
+    <div className={`xray-card ${theme}`}>
       
-      {/* Visual Container: Uses standard img tag with the same CSS classes */}
+      {/* X-Ray Image */}
       <div className="xray-image-container">
         <img
-          src={xray.thumbnail}
-          alt={xray.type}
+          src={xrayImage}
+          alt={xrayType}
           className="xray-image"
-          // Ensures the image maintains its aspect ratio as defined in your CSS
-          loading="lazy" 
+          loading="lazy"
         />
       </div>
 
       <div className="xray-content">
+        
+        {/* X-Ray Title and Status */}
         <div className="xray-header">
-          <h3 className="xray-title">{xray.type}</h3>
+          <h3 className="xray-title">{xrayType}</h3>
 
-          {/* Conditional Rendering: Shows status badge */}
+          {/* Show badge only if this X-ray has analysis */}
           {xray.hasAnalysis && (
             <span className="xray-badge">
               <CheckCircle2 className="icon-small" />
@@ -40,11 +58,13 @@ export function XRayCard({
           )}
         </div>
 
-        <p className="xray-date">{formatDate(xray.date)}</p>
+        {/* X-Ray Date */}
+        <p className="xray-date">{xrayDate}</p>
 
-        {/* Action Button: Dynamic state handling */}
+        {/* Action Button */}
         <button
-          onClick={() => onAnalyze()}
+          type="button"
+          onClick={onAnalyze}
           disabled={isAnalyzing}
           className={`xray-button ${isAnalyzing ? "disabled" : ""}`}
         >

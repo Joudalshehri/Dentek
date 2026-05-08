@@ -251,7 +251,7 @@ class ProfileViewTest(APITestCase):
         self.mock_user.email = "test@test.com"
         self.mock_user.pk = 1  # Assign a mock Primary Key to simulate a saved database record
 
-    # 1Test Profile Retrieval (GET Success)
+    # Test Profile Retrieval (GET Success)
     def test_get_profile(self):
         # Force authentication with the mock user to pass @permission_classes([IsAuthenticated])
         self.client.force_authenticate(user=self.mock_user)
@@ -272,8 +272,7 @@ class ProfileViewTest(APITestCase):
             "email": "new_email@test.com"
         }
 
-        response = self.client.put(self.url, updated_data)
-
+        response = self.client.put("/api/profile/update/", updated_data)
         # Verify the API response message
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["message"], "Updated successfully")
@@ -362,7 +361,7 @@ class CreatePatientTest(APITestCase):
         response = self.client.post(self.url, data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["error"], "Patient ID already exists")
+        self.assertEqual( response.data["patient_id"],  "Patient ID already exists.")
 
     # Test Unauthorized Access
     def test_create_patient_unauthorized(self):

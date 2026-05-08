@@ -13,11 +13,9 @@ class Patient(models.Model):
     )
 
     patient_id = models.CharField(
-        max_length=50,
-        unique=True,
-        null=True,
-        blank=True
-    )
+    max_length=10,
+    unique=True
+)
 
     name = models.CharField(max_length=200)
     birth_date = models.DateField(null=True, blank=True)

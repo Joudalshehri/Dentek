@@ -1,4 +1,4 @@
-import xrayBg from "@/assets/0274894b2227898af4890d0f95b917c90d00b2e4.png";
+import xrayBg from "@/assets/Background.png";
 
 /**
  * HeroSection

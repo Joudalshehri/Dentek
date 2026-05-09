@@ -1,5 +1,5 @@
 import { Moon, Sun } from "lucide-react";
-import logo from "@/assets/0b7e942602c249fe1ebd2f413e4a81dfd2bc24e8.png";
+import logo from "@/assets/Logo.png";
 
 /**
  * Header

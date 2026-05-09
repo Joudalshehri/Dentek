@@ -8,114 +8,156 @@ import { Footer } from "./Footer";
 
 import { useDarkMode } from "../contexts/DarkModeContext";
 
-import imageAsset from "@/assets/559b2b6797b2f31d3e60b52cb3f1f2393cf11a4c.png";
-import logo from "@/assets/0b7e942602c249fe1ebd2f413e4a81dfd2bc24e8.png";
+import imageAsset from "@/assets/Tooth.png";
+import logo from "@/assets/Logo.png";
 import "../../styles/LoginPage.css";
 
 /**
  * LoginPage
  *
  * Renders the login form and handles user authentication.
- * The page validates required fields before sending the login request
- * to the Django backend.
+ * Validation is handled by the Django backend.
+ * Frontend only displays server error messages.
  */
 export function LoginPage({
   onNavigateToLanding,
   onLoginSuccess,
   onNavigateToForgotPassword,
 }) {
+
+  // =========================
+  // State Management
+  // =========================
+
+  // Stores username or email input
   const [username, setUsername] = useState("");
+
+  // Stores password input
   const [password, setPassword] = useState("");
+
+  // Controls password visibility
   const [showPassword, setShowPassword] = useState(false);
+
+  // Controls loading state during login request
   const [isLoading, setIsLoading] = useState(false);
 
-  const [errors, setErrors] = useState({});
+  // Stores backend error messages
   const [serverError, setServerError] = useState("");
 
+  // Dark mode context
   const { isDarkMode, toggleDarkMode } = useDarkMode();
 
-  // Checks whether the username/email and password fields are valid.
-  const validateForm = () => {
-    const newErrors = {};
 
-    if (!username.trim()) {
-      newErrors.username = "Username or email is required.";
-    }
+  // =========================
+  // Input Handlers
+  // =========================
 
-    if (!password.trim()) {
-      newErrors.password = "Password is required.";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Handles input updates and clears the related validation error.
+  // Updates username/email input
   const handleUsernameChange = (e) => {
     setUsername(e.target.value);
 
-    if (errors.username) {
-      setErrors((prev) => ({ ...prev, username: "" }));
-    }
-
+    // Clears old server error when user types again
     if (serverError) {
       setServerError("");
     }
   };
 
-  // Handles password updates and clears the related validation error.
+  // Updates password input
   const handlePasswordChange = (e) => {
     setPassword(e.target.value);
 
-    if (errors.password) {
-      setErrors((prev) => ({ ...prev, password: "" }));
-    }
-
+    // Clears old server error when user types again
     if (serverError) {
       setServerError("");
     }
   };
 
-  // Sends login credentials to the backend and stores the returned token.
+
+  // =========================
+  // Login Request
+  // =========================
+
+  // Sends login request to Django backend
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Prevents duplicate requests
     if (isLoading) return;
 
     setServerError("");
-
-    if (!validateForm()) return;
-
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/login/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
-      });
 
+      // Sends login request to backend API
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/login/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            username: username.trim(),
+            password: password,
+          }),
+        }
+      );
+
+      // Converts response into JSON
       const data = await response.json();
 
+      // Login success
       if (response.ok && data.success) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("username", data.username || username.trim());
-        localStorage.setItem("email", data.email || "");
 
+        // Stores authentication token
+        localStorage.setItem("token", data.token);
+
+        // Stores username
+        localStorage.setItem(
+          "username",
+          data.username || username.trim()
+        );
+
+        // Stores email
+        localStorage.setItem(
+          "email",
+          data.email || ""
+        );
+
+        // Redirects user after successful login
         onLoginSuccess();
+
         return;
       }
 
+      // Displays backend error message
       setServerError(
-        data.error || "Invalid username or password. Please try again."
+        data.error ||
+        "Invalid username or password. Please try again."
       );
+
     } catch (error) {
+
       console.error("Login error:", error);
-      setServerError("Server connection failed. Please make sure Django is running.");
+
+      // Displays server connection error
+      setServerError(
+        "Server connection failed. Please make sure Django is running."
+      );
+
     } finally {
+
+      // Stops loading state
       setIsLoading(false);
     }
   };
+
+
+  // =========================
+  // UI Rendering
+  // =========================
 
   return (
     <div className={`login-container ${isDarkMode ? "dark" : "light"}`}>
@@ -131,22 +173,27 @@ export function LoginPage({
 
       <main className="main-wrapper">
         <div className="login-card">
+        {/* Left side - Login form */}
           <div className="form-side">
+
             <div className="form-header">
               <h1>Welcome back!</h1>
               <p>Please enter your credentials to continue</p>
             </div>
 
             <form onSubmit={handleSubmit} noValidate>
+
+              {/* Username or Email Field */}
               <InputField
                 label="Username or Email"
                 type="text"
                 value={username}
                 onChange={handleUsernameChange}
                 placeholder="Enter your username or email"
-                error={errors.username}
+                error=""
               />
 
+              {/* Password Field */}
               <InputField
                 label="Password"
                 type={showPassword ? "text" : "password"}
@@ -155,34 +202,54 @@ export function LoginPage({
                 placeholder="Enter your password"
                 isPassword={true}
                 showPassword={showPassword}
-                togglePassword={() => setShowPassword((prev) => !prev)}
-                error={errors.password}
+                togglePassword={() =>
+                  setShowPassword((prev) => !prev)
+                }
+                error=""
               />
 
-              <FormControls onForgotPassword={onNavigateToForgotPassword} />
+              {/* Forgot password section */}
+              <FormControls
+                onForgotPassword={onNavigateToForgotPassword}
+              />
 
+              {/* Backend error message */}
               {serverError && (
                 <p className="form-error" role="alert">
                   {serverError}
                 </p>
               )}
 
-              <button type="submit" disabled={isLoading} className="submit-btn">
+              {/* Submit button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="submit-btn"
+              >
                 {isLoading ? "Processing..." : "Sign In"}
               </button>
 
+              {/* Footer hint */}
               <div className="form-footer-hint">
                 <p>
                   Don&apos;t have an account?{" "}
-                  <button type="button" className="contact-link">
+
+                  <button
+                    type="button"
+                    className="contact-link"
+                  >
                     Contact Administrator
                   </button>
+
                 </p>
               </div>
+
             </form>
           </div>
 
+          {/* Right side image */}
           <ImageSide asset={imageAsset} />
+
         </div>
       </main>
 

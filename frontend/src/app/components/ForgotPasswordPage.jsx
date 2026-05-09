@@ -6,8 +6,8 @@ import { ImageSide } from "./ImageSide";
 import { Footer } from "./Footer";
 import { useDarkMode } from "../contexts/DarkModeContext";
 
-import imageAsset from "@/assets/559b2b6797b2f31d3e60b52cb3f1f2393cf11a4c.png";
-import logo from "@/assets/0b7e942602c249fe1ebd2f413e4a81dfd2bc24e8.png";
+import imageAsset from "@/assets/Tooth.png";
+import logo from "@/assets/Logo.png";
 import "../../styles/LoginPage.css";
 
 /**

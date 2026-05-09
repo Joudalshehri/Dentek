@@ -8,8 +8,13 @@ from .models import Patient, XRay
 from .services.ai_pipeline import run_full_analysis
 from .services.analysis_result_builder import AnalysisResultBuilder
 
+
 from django.contrib.auth import authenticate
-from django.http import JsonResponse
+#from django.http import JsonResponse
+
+import re
+from datetime import date
+from django.utils.dateparse import parse_date
 
 import json
 import os
@@ -17,9 +22,6 @@ from groq import Groq
 from dotenv import load_dotenv
 
 
-from django.http import JsonResponse
-from groq import Groq
-import os
 
 load_dotenv()
 
@@ -27,39 +29,395 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 client = Groq(api_key=GROQ_API_KEY)
 
+# Login Method
+@api_view(["POST"])
+def login_view(request):
+    """
+    Authenticates the user using either username or email.
+    Returns a token if the credentials are valid.
+    """
 
-def test_groq(request):
+    username_or_email = request.data.get("username", "").strip()
+    password = request.data.get("password", "")
 
-    if not GROQ_API_KEY:
-        return JsonResponse({
-            "success": False,
-            "error": "GROQ_API_KEY is missing"
-        }, status=500)
-
-    try:
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "user", "content": "Say hello"}
-            ],
-            model="llama-3.3-70b-versatile",
+    # Validation: username/email is required
+    if not username_or_email:
+        return Response(
+            {
+                "success": False,
+                "error": "Please enter your username or email",
+            },
+            status=status.HTTP_400_BAD_REQUEST
         )
 
-        return JsonResponse({
+    # Validation: password is required
+    if not password:
+        return Response(
+            {
+                "success": False,
+                "error": "Please enter your password",
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # If input is email, get the related username
+    user_obj = User.objects.filter(
+        email__iexact=username_or_email
+    ).first()
+
+    if user_obj:
+        username = user_obj.username
+    else:
+        username = username_or_email
+        
+    # Django handles authentication automatically
+    user = authenticate(
+        request,
+        username=username,
+        password=password
+    )
+
+    # Login success
+    if user is not None:
+        token, created = Token.objects.get_or_create(user=user)
+
+        return Response({
             "success": True,
-            "response": response.choices[0].message.content
+            "token": token.key,
+            "username": user.username,
+            "email": user.email,
         })
 
-    except AttributeError as e:
-        return JsonResponse({
+    # Invalid credentials
+    return Response(
+        {
             "success": False,
-            "error": f"Invalid response structure: {str(e)}"
-        }, status=500)
+            "error": "Incorrect username/email or password",
+        },
+        status=status.HTTP_401_UNAUTHORIZED
+    )
+    
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_patient(request):
+    """
+    Creates a new patient record.
+    Performs manual validation and returns field-specific error messages.
+    """
+    data = request.data
+    errors = {}
+
+    # Extract and clean data
+    patient_code = data.get("patient_id", "").strip()
+    full_name = data.get("name", "").strip()
+    birth_date = data.get("birth_date") or data.get("birthDate")
+    phone = data.get("phone", "").strip()
+    email = data.get("email", "").strip()
+
+    # 1. National ID (patient_id) Validation
+    if not patient_code:
+        errors["patient_id"] = "National ID is required."
+    elif not re.match(r"^\d{10}$", patient_code):
+        errors["patient_id"] = "National ID must be exactly 10 digits."
+    elif Patient.objects.filter(user=request.user, patient_id=patient_code).exists():
+        errors["patient_id"] = "A patient with this ID already exists."
+
+    # 2. Name Validation
+    if not full_name:
+        errors["name"] = "Full name is required."
+    elif not re.match(r"^[A-Za-z\u0600-\u06FF\s]+$", full_name):
+        errors["name"] = "Name must contain letters only."
+
+    # 3. Birth Date Validation
+    if not birth_date:
+        errors["birthDate"] = "Date of birth is required."
+    else:
+        parsed_birth_date = parse_date(birth_date)
+        if not parsed_birth_date:
+            errors["birthDate"] = "Invalid date format."
+        elif parsed_birth_date > date.today():
+            errors["birthDate"] = "Birth date cannot be in the future."
+
+    # 4. Phone Validation
+    if not phone:
+        errors["phone"] = "Phone number is required."
+    elif not re.match(r"^05\d{8}$", phone):
+        errors["phone"] = "Phone must start with 05 and contain 10 digits."
+
+    # 5. Email Validation
+    if not email:
+        errors["email"] = "Email address is required."
+    else:
+        email_pattern = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
+        if not re.match(email_pattern, email):
+            errors["email"] = "Please enter a valid email address."
+
+    # Return 400 Bad Request if any validation failed
+    if errors:
+        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Create instance linked to the current logged-in user
+        patient = Patient.objects.create(
+            user=request.user,
+            patient_id=patient_code,
+            name=full_name,
+            birth_date=birth_date,
+            phone=phone,
+            email=email,
+        )
+
+        return Response(
+            {
+                "id": patient.id,
+                "patient_id": patient.patient_id,
+                "name": patient.name,
+                "message": "Patient registered successfully",
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     except Exception as e:
-        return JsonResponse({
-            "success": False,
-            "error": str(e)
-        }, status=500)
+        # Unexpected server-side failures
+        return Response(
+            {"form": f"Internal server error: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_patient(request, patient_id):
+    """
+    Get a specific patient that belongs to the authenticated user.
+    """
+
+    try:
+        # Get patient by ID and make sure it belongs to the current user
+        patient = Patient.objects.get(id=patient_id, user=request.user)
+
+    except Patient.DoesNotExist:
+        # Return 404 if patient does not exist or does not belong to user
+        return Response({"error": "Patient not found"}, status=404)
+
+    # Return patient details to the frontend
+    return Response({
+        "id": patient.id,
+        "patient_id": patient.patient_id,
+        "name": patient.name,
+        "age": patient.age,
+        "birth_date": patient.birth_date,
+        "phone": patient.phone,
+        "email": patient.email,
+    })
+
+
+# GET: Retrieve all patients for the logged-in user
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_patients(request):
+
+    patients = Patient.objects.filter( user=request.user).order_by("-id")
+
+    data = []
+
+    for p in patients:
+        data.append({
+            "id": p.id,
+            "patient_id": p.patient_id,
+            "name": p.name,
+            "age": p.age,
+            "birth_date": p.birth_date,
+            "phone": p.phone,
+            "email": p.email,
+        })
+
+    return Response(data)
+
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def upload_xray(request):
+    """
+    Upload a new X-ray image for a specific patient.
+    """
+
+    # Get patient ID and uploaded image from the request
+    patient_id = request.data.get("patient_id")
+    image = request.FILES.get("image")
+
+    # Validate that patient_id is provided
+    if not patient_id:
+        return Response({"error": "patient_id is required"}, status=400)
+
+    # Validate that image file is provided
+    if not image:
+        return Response({"error": "image is required"}, status=400)
+
+    # --- Start Image Extension Validation ---
+    # Define allowed extensions
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+    extension = os.path.splitext(image.name)[1].lower()
+
+    if extension not in allowed_extensions:
+        return Response(
+            {"error": "Invalid file type. Only PNG, JPG, and JPEG are allowed."}, 
+            status=400
+        )
+    
+    # Extra check for content type to ensure it's actually an image
+    if not image.content_type.startswith('image/'):
+        return Response({"error": "File must be a valid image."}, status=400)
+    # --- End Image Extension Validation ---
+
+    try:
+        # Make sure the patient exists and belongs to the current user
+        patient = Patient.objects.get(id=patient_id, user=request.user)
+
+    except Patient.DoesNotExist:
+        return Response({"error": "Patient not found"}, status=404)
+
+    # Create new X-ray record linked to the patient
+    xray = XRay.objects.create(
+        patient=patient,
+        image=image
+    )
+
+    # Return uploaded X-ray information
+    return Response(
+        {
+            "id": xray.id,
+            "image_url": xray.image.url,
+            "created_at": xray.created_at,
+            "has_analysis": False,
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_xrays(request):
+    """
+    List all X-rays for a specific patient.
+    """
+
+    # Get patient ID from query parameters
+    patient_id = request.GET.get("patient_id")
+
+    # Validate that patient_id is provided
+    if not patient_id:
+        return Response({"error": "patient_id is required"}, status=400)
+
+    try:
+        # Make sure the patient belongs to the authenticated user
+        patient = Patient.objects.get(id=patient_id, user=request.user)
+
+    except Patient.DoesNotExist:
+        return Response({"error": "Patient not found"}, status=404)
+
+    # Get patient's X-rays, newest first
+    xrays = XRay.objects.filter(patient=patient).order_by("-created_at")
+
+    data = []
+
+    # Format X-ray data for frontend
+    for x in xrays:
+        data.append({
+            "id": x.id,
+            "image_url": x.image.url,
+            "created_at": x.created_at,
+            "has_analysis": x.analysis_result is not None,
+        })
+
+    return Response(data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def analyze_xray_view(request, xray_id):
+    """
+    Run AI analysis on a selected X-ray image.
+    """
+
+    try:
+        # Get X-ray and its patient, ensuring ownership by current user
+        xray = XRay.objects.select_related("patient").get(
+            id=xray_id,
+            patient__user=request.user
+        )
+
+    except XRay.DoesNotExist:
+        return Response({"error": "XRay not found"}, status=404)
+
+    # Validate that the X-ray has an image field
+    if not xray.image:
+        return Response({"error": "No image found for this XRay"}, status=400)
+
+    # Validate that the image file exists on the server
+    if not os.path.exists(xray.image.path):
+        return Response({"error": "XRay image file does not exist"}, status=404)
+
+    # Run the full AI analysis pipeline
+    result = run_full_analysis(xray.image.path)
+
+    # Extract analysis sections safely
+    report = result.get("report", {})
+    findings = result.get("findings", [])
+    impacted_findings = result.get("impacted_findings", [])
+    lesion_findings = result.get("lesion_findings", result.get("findings", []))
+
+    # Generate recommendation based on AI findings
+    recommendation = generate_dental_recommendation(
+        report=report,
+        findings=findings,
+        impacted_findings=impacted_findings,
+        lesion_findings=lesion_findings,
+    )
+
+    # Build final structured analysis result
+    xray.analysis_result = (
+        AnalysisResultBuilder(xray)
+        .add_basic_info()
+        .add_report(report)
+        .add_findings(findings)
+        .add_impacted_findings(impacted_findings)
+        .add_lesion_findings(lesion_findings)
+        .add_recommendation(recommendation)
+        .build()
+    )
+
+    # Save analysis result in database
+    xray.save()
+
+    # Return final analysis result to frontend
+    return Response(xray.analysis_result, status=200)
+
+
+# ------------------------------
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_xray_analysis(request, xray_id):
+    try:
+        # Securely fetch record ensuring ownership via patient-user relationship
+        xray = XRay.objects.select_related("patient").get(
+            id=xray_id,
+            patient__user=request.user
+        )
+    except XRay.DoesNotExist:
+        # Handle record absence or unauthorized access attempts
+        return Response({"error": "XRay not found"}, status=404)
+
+    # Verify that the diagnostic analysis data is available
+    if not xray.analysis_result:
+        return Response({"error": "No analysis found for this xray"}, status=404)
+
+    # Merge automated analysis results with clinical annotations
+    data = xray.analysis_result.copy()
+    data["doctor_notes"] = xray.doctor_notes
+    data["edited_report"] = xray.edited_report
+
+    return Response(data, status=200)
+
 
 
 def make_json_safe(obj):
@@ -223,416 +581,6 @@ Return JSON only in this exact format:
         }
 
 
-@api_view(["POST"])
-def login_view(request):
-    """
-    Authenticates the user using either username or email.
-    Returns a token if the credentials are valid.
-    """
-    username_or_email = request.data.get("username", "").strip()
-    password = request.data.get("password", "")
-
-    if not username_or_email or not password:
-        return Response(
-            {
-                "success": False,
-                "error": "Username/email and password are required",
-            },
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    # If the input is an email, find the related user first.
-    user_obj = User.objects.filter(email__iexact=username_or_email).first()
-
-    if user_obj:
-        username = user_obj.username
-    else:
-        username = username_or_email
-
-    user = authenticate(request, username=username, password=password)
-
-    if user is not None:
-        token, created = Token.objects.get_or_create(user=user)
-
-        return Response({
-            "success": True,
-            "token": token.key,
-            "username": user.username,
-            "email": user.email,
-        })
-
-    return Response(
-        {"success": False, "error": "Invalid credentials"},
-        status=status.HTTP_401_UNAUTHORIZED
-    )
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def profile_view(request):
-    user = request.user
-
-    """
-    Fetch the profile details of the currently logged-in user.
-    Access restricted to authenticated users only.
-    """
-
-    return Response({
-        "username": user.username,
-        "email": user.email,
-    })
-
-@api_view(["PUT"])
-@permission_classes([IsAuthenticated])
-def update_profile_view(request):
-    """
-    Update user profile with manual validation logic.
-    Ensures data integrity by checking constraints before persistence.
-    """
-    user = request.user
-    data = request.data
-    errors = {}
-
-    # Extract and sanitize input data (Strip whitespace)
-    username = data.get("username", user.username).strip()
-    email = data.get("email", user.email).strip()
-
-    # --- Username Validation ---
-    # Ensure the username is not empty or composed solely of whitespace
-    if not username:
-        errors["username"] = "Username is required"
-
-    # --- Email Validation (Mirrors Frontend Logic) ---
-    if not email:
-        errors["email"] = "Email address is required"
-    else:
-        # Check for basic structure: existence of '@' and '.'
-        if "@" not in email or "." not in email:
-            errors["email"] = "Please enter a complete email (e.g., example@domain.com)"
-        
-        # Ensure the last dot occurs after the '@' symbol
-        elif email.rfind(".") < email.find("@"):
-            errors["email"] = "Invalid email structure"
-            
-        # Regex check for standard email format validation
-        elif not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
-            errors["email"] = "Email domain is incomplete or invalid"
-
-    # --- Response Handling ---
-    # If validation dictionary is not empty, return a 400 Bad Request
-    if errors:
-        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        # Update user instance and commit changes to the database
-        user.username = username
-        user.email = email
-        user.save()
-        
-        return Response({
-            "message": "Updated successfully",
-            "username": user.username,
-            "email": user.email,
-        }, status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        # Handle unexpected database or server-side errors
-        return Response(
-            {"detail": "A server error occurred during update."}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def create_patient(request):
-    """
-    Handle patient registration with comprehensive server-side validation.
-    Ensures all required fields meet structural and business logic constraints.
-    """
-    data = request.data
-    errors = {}
-
-    # Extracting data fields
-    patient_code = data.get("patient_id", "").strip()
-    full_name = data.get("name", "").strip()
-    birth_date = data.get("birthDate") or data.get("birth_date")
-    phone = data.get("phone", "").strip()
-    email = data.get("email", "").strip()
-
-    # --- National ID (patient_id) Validation ---
-    if not patient_code:
-        errors["patient_id"] = "National ID is required"
-    elif Patient.objects.filter(patient_id=patient_code).exists():
-        errors["patient_id"] = "Patient ID already exists."
-
-    # --- Full Name Validation ---
-    if not full_name:
-        errors["name"] = "Full name is required"
-
-    # --- Date of Birth Validation ---
-    if not birth_date:
-        errors["birthDate"] = "Date of birth is required"
-
-    # --- Phone Number Validation ---
-    if not phone:
-        errors["phone"] = "Phone number is required"
-    elif not re.match(r"^05\d{8}$", phone):
-        errors["phone"] = "Invalid phone format (e.g., 05xxxxxxxx)"
-
-    # --- Email Validation ---
-    if email: # Email is often optional, but if provided, it must be valid
-        email_pattern = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
-        if not re.match(email_pattern, email):
-            errors["email"] = "Please enter a valid email address"
-
-    # --- Early Return if Validation Fails ---
-    if errors:
-        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        # Create and persist the patient record
-        patient = Patient.objects.create(
-            user=request.user,
-            patient_id=patient_code,
-            name=full_name,
-            birth_date=birth_date,
-            phone=phone,
-            email=email,
-        )
-
-        return Response(
-            {
-                "id": patient.id,
-                "patient_id": patient.patient_id,
-                "name": patient.name,
-                "message": "Patient registered successfully"
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-    except Exception as e:
-        # Catch unexpected integrity or database errors
-        return Response(
-            {"form": "An unexpected error occurred during patient registration."},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-    
-# GET: Retrieve all patients for the logged-in user
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def list_patients(request):
-
-    patients = Patient.objects.filter( user=request.user).order_by("-id")
-
-    data = []
-
-    for p in patients:
-        data.append({
-            "id": p.id,
-            "patient_id": p.patient_id,
-            "name": p.name,
-            "age": p.age,
-            "birth_date": p.birth_date,
-            "phone": p.phone,
-            "email": p.email,
-        })
-
-    return Response(data)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_patient(request, patient_id):
-    """
-    Get a specific patient that belongs to the authenticated user.
-    """
-
-    try:
-        # Get patient by ID and make sure it belongs to the current user
-        patient = Patient.objects.get(id=patient_id, user=request.user)
-
-    except Patient.DoesNotExist:
-        # Return 404 if patient does not exist or does not belong to user
-        return Response({"error": "Patient not found"}, status=404)
-
-    # Return patient details to the frontend
-    return Response({
-        "id": patient.id,
-        "patient_id": patient.patient_id,
-        "name": patient.name,
-        "age": patient.age,
-        "birth_date": patient.birth_date,
-        "phone": patient.phone,
-        "email": patient.email,
-    })
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def upload_xray(request):
-    """
-    Upload a new X-ray image for a specific patient.
-    """
-
-    # Get patient ID and uploaded image from the request
-    patient_id = request.data.get("patient_id")
-    image = request.FILES.get("image")
-
-    # Validate that patient_id is provided
-    if not patient_id:
-        return Response({"error": "patient_id is required"}, status=400)
-
-    # Validate that image file is provided
-    if not image:
-        return Response({"error": "image is required"}, status=400)
-
-    try:
-        # Make sure the patient exists and belongs to the current user
-        patient = Patient.objects.get(id=patient_id, user=request.user)
-
-    except Patient.DoesNotExist:
-        return Response({"error": "Patient not found"}, status=404)
-
-    # Create new X-ray record linked to the patient
-    xray = XRay.objects.create(
-        patient=patient,
-        image=image
-    )
-
-    # Return uploaded X-ray information
-    return Response(
-        {
-            "id": xray.id,
-            "image_url": xray.image.url,
-            "created_at": xray.created_at,
-            "has_analysis": False,
-        },
-        status=status.HTTP_201_CREATED,
-    )
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def list_xrays(request):
-    """
-    List all X-rays for a specific patient.
-    """
-
-    # Get patient ID from query parameters
-    patient_id = request.GET.get("patient_id")
-
-    # Validate that patient_id is provided
-    if not patient_id:
-        return Response({"error": "patient_id is required"}, status=400)
-
-    try:
-        # Make sure the patient belongs to the authenticated user
-        patient = Patient.objects.get(id=patient_id, user=request.user)
-
-    except Patient.DoesNotExist:
-        return Response({"error": "Patient not found"}, status=404)
-
-    # Get patient's X-rays, newest first
-    xrays = XRay.objects.filter(patient=patient).order_by("-created_at")
-
-    data = []
-
-    # Format X-ray data for frontend
-    for x in xrays:
-        data.append({
-            "id": x.id,
-            "image_url": x.image.url,
-            "created_at": x.created_at,
-            "has_analysis": x.analysis_result is not None,
-        })
-
-    return Response(data)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def analyze_xray_view(request, xray_id):
-    """
-    Run AI analysis on a selected X-ray image.
-    """
-
-    try:
-        # Get X-ray and its patient, ensuring ownership by current user
-        xray = XRay.objects.select_related("patient").get(
-            id=xray_id,
-            patient__user=request.user
-        )
-
-    except XRay.DoesNotExist:
-        return Response({"error": "XRay not found"}, status=404)
-
-    # Validate that the X-ray has an image field
-    if not xray.image:
-        return Response({"error": "No image found for this XRay"}, status=400)
-
-    # Validate that the image file exists on the server
-    if not os.path.exists(xray.image.path):
-        return Response({"error": "XRay image file does not exist"}, status=404)
-
-    # Run the full AI analysis pipeline
-    result = run_full_analysis(xray.image.path)
-
-    # Extract analysis sections safely
-    report = result.get("report", {})
-    findings = result.get("findings", [])
-    impacted_findings = result.get("impacted_findings", [])
-    lesion_findings = result.get("lesion_findings", result.get("findings", []))
-
-    # Generate recommendation based on AI findings
-    recommendation = generate_dental_recommendation(
-        report=report,
-        findings=findings,
-        impacted_findings=impacted_findings,
-        lesion_findings=lesion_findings,
-    )
-
-    # Build final structured analysis result
-    xray.analysis_result = (
-        AnalysisResultBuilder(xray)
-        .add_basic_info()
-        .add_report(report)
-        .add_findings(findings)
-        .add_impacted_findings(impacted_findings)
-        .add_lesion_findings(lesion_findings)
-        .add_recommendation(recommendation)
-        .build()
-    )
-
-    # Save analysis result in database
-    xray.save()
-
-    # Return final analysis result to frontend
-    return Response(xray.analysis_result, status=200)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_xray_analysis(request, xray_id):
-    try:
-        # Securely fetch record ensuring ownership via patient-user relationship
-        xray = XRay.objects.select_related("patient").get(
-            id=xray_id,
-            patient__user=request.user
-        )
-    except XRay.DoesNotExist:
-        # Handle record absence or unauthorized access attempts
-        return Response({"error": "XRay not found"}, status=404)
-
-    # Verify that the diagnostic analysis data is available
-    if not xray.analysis_result:
-        return Response({"error": "No analysis found for this xray"}, status=404)
-
-    # Merge automated analysis results with clinical annotations
-    data = xray.analysis_result.copy()
-    data["doctor_notes"] = xray.doctor_notes
-    data["edited_report"] = xray.edited_report
-
-    return Response(data, status=200)
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_reports(request):
@@ -739,3 +687,79 @@ def update_report(request, xray_id):
         "message": "Notes updated successfully.",
         "doctor_notes": xray.doctor_notes,
     }, status=200)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def profile_view(request):
+    user = request.user
+
+    """
+    Fetch the profile details of the currently logged-in user.
+    Access restricted to authenticated users only.
+    """
+
+    return Response({
+        "username": user.username,
+        "email": user.email,
+    })
+
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def update_profile_view(request):
+    """
+    Update user profile with manual validation logic.
+    Ensures data integrity by checking constraints before persistence.
+    """
+    user = request.user
+    data = request.data
+    errors = {}
+
+    # Extract and sanitize input data (Strip whitespace)
+    username = data.get("username", user.username).strip()
+    email = data.get("email", user.email).strip()
+
+    # --- Username Validation ---
+    # Ensure the username is not empty or composed solely of whitespace
+    if not username:
+        errors["username"] = "Username is required"
+
+    # --- Email Validation (Mirrors Frontend Logic) ---
+    if not email:
+        errors["email"] = "Email address is required"
+    else:
+        # Check for basic structure: existence of '@' and '.'
+        if "@" not in email or "." not in email:
+            errors["email"] = "Please enter a complete email (e.g., example@domain.com)"
+        
+        # Ensure the last dot occurs after the '@' symbol
+        elif email.rfind(".") < email.find("@"):
+            errors["email"] = "Invalid email structure"
+            
+        # Regex check for standard email format validation
+        elif not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+            errors["email"] = "Email domain is incomplete or invalid"
+
+    # --- Response Handling ---
+    # If validation dictionary is not empty, return a 400 Bad Request
+    if errors:
+        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Update user instance and commit changes to the database
+        user.username = username
+        user.email = email
+        user.save()
+        
+        return Response({
+            "message": "Updated successfully",
+            "username": user.username,
+            "email": user.email,
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        # Handle unexpected database or server-side errors
+        return Response(
+            {"detail": "A server error occurred during update."}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

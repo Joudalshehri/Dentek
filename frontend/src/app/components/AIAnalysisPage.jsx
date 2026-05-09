@@ -417,7 +417,7 @@ export function AIAnalysisPage({
           )}
 
           <section className="doctor-notes-section">
-            <h2>Doctor Notes</h2>
+            <h2 className="image-section-title">Doctor Notes</h2>
 
             <div className="notes-container">
               <textarea

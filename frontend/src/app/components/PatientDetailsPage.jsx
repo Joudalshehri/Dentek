@@ -7,6 +7,12 @@ import { XRayCard } from "./XRayCard";
 
 import "../../styles/PatientDetailsPage.css";
 
+/**
+ * PatientDetailsPage Component
+ * ----------------------------
+ * Manages the display of patient profiles and their associated X-ray records.
+ * Features include secure data fetching, file uploads, and AI-driven analysis.
+ */
 export function PatientDetailsPage({
   patientId,
   onBack,
@@ -19,72 +25,67 @@ export function PatientDetailsPage({
   const [xrays, setXrays] = useState([]);
   const [loading, setLoading] = useState(false);
   const [analyzingXrayId, setAnalyzingXrayId] = useState(null);
+  
+  /** 
+   * Local state to manage inline error messages.
+   * This replaces legacy window alerts for a modern UI experience.
+   */
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // ===== AUTH TOKEN =====
+  // ===== AUTHENTICATION UTILITIES =====
   const getToken = () => localStorage.getItem("token");
 
   const getAuthHeaders = () => ({
     Authorization: `Token ${getToken()}`,
   });
 
-  // ===== FETCH PATIENT DETAILS =====
+  // ===== DATA PERSISTENCE: PATIENT DETAILS =====
   const fetchPatient = async () => {
     try {
+      setErrorMessage(""); 
       const response = await fetch(
         `http://127.0.0.1:8000/api/patients/${patientId}/`,
-        {
-          headers: getAuthHeaders(),
-        }
+        { headers: getAuthHeaders() }
       );
 
       if (!response.ok) {
-        console.error("Failed to fetch patient:", response.status);
+        const errorData = await response.json().catch(() => ({}));
+        setErrorMessage(errorData.error || "Critical error: Unable to retrieve patient profile.");
         return;
       }
 
       const data = await response.json();
 
-      // Normalize patient object
-      const formattedPatient = {
+      setPatient({
         id: String(data.id),
         patient_id: data.patient_id,
         name: data.name,
         age: data.age,
         phone: data.phone,
         email: data.email,
-      };
+      });
 
-      setPatient(formattedPatient);
-
-      // Store selected patient info locally
       localStorage.setItem("selectedPatientName", data.name);
       localStorage.setItem("selectedPatientAge", String(data.age));
 
     } catch (err) {
-      console.error("Error fetching patient:", err);
+      setErrorMessage("Network anomaly detected. Failed to connect to the server.");
     }
   };
 
-  // ===== FETCH XRAYS LIST =====
+  // ===== DATA PERSISTENCE: X-RAY RECORDS =====
   const fetchXrays = async () => {
     try {
       setLoading(true);
-
       const response = await fetch(
         `http://127.0.0.1:8000/api/xrays/?patient_id=${patientId}`,
-        {
-          headers: getAuthHeaders(),
-        }
+        { headers: getAuthHeaders() }
       );
 
-      if (!response.ok) {
-        console.error("Failed to fetch xrays:", response.status);
-        return;
-      }
+      if (!response.ok) return;
 
       const data = await response.json();
 
-      // Format API response for UI
       const formatted = data.map((item) => ({
         id: item.id.toString(),
         type: "Panoramic X-Ray",
@@ -96,26 +97,21 @@ export function PatientDetailsPage({
       setXrays(formatted);
 
     } catch (err) {
-      console.error("Error fetching xrays:", err);
+      console.error("X-ray synchronization failed:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // ===== INITIAL DATA LOAD =====
   useEffect(() => {
     fetchPatient();
     fetchXrays();
   }, [patientId]);
 
-  // ===== UPLOAD XRAY =====
+  // ===== ACTION HANDLER: FILE UPLOADS =====
   const handleUploadXray = async (file) => {
+    setErrorMessage(""); 
     const token = getToken();
-
-    if (!token) {
-      console.error("No auth token found");
-      return;
-    }
 
     const formData = new FormData();
     formData.append("patient_id", patientId);
@@ -126,28 +122,29 @@ export function PatientDetailsPage({
         "http://127.0.0.1:8000/api/xrays/upload/",
         {
           method: "POST",
-          headers: {
-            Authorization: `Token ${token}`,
-          },
+          headers: { Authorization: `Token ${token}` },
           body: formData,
         }
       );
 
+      const result = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        console.error("Failed to upload xray:", response.status);
+        setErrorMessage(result.error || "Upload rejected by the server.");
         return;
       }
 
-      await fetchXrays();
+      await fetchXrays(); 
 
     } catch (err) {
-      console.error("Error uploading xray:", err);
+      setErrorMessage("Communication failure during file transmission.");
     }
   };
 
-  // ===== ANALYZE XRAY =====
+  // ===== ACTION HANDLER: AI ANALYSIS =====
   const handleAnalyzeXray = async (xrayId) => {
     try {
+      setErrorMessage("");
       setAnalyzingXrayId(xrayId);
 
       const response = await fetch(
@@ -158,48 +155,37 @@ export function PatientDetailsPage({
         }
       );
 
+      const analysisData = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        console.error("Failed to analyze xray:", response.status);
-        alert("Failed to analyze X-ray");
+        setErrorMessage(analysisData.error || "AI Engine failed to process the request.");
         return;
       }
 
-      const analysisData = await response.json();
-
-      // Save latest analysis for later use
-      localStorage.setItem(
-        "latestAnalysis",
-        JSON.stringify(analysisData)
-      );
-
+      localStorage.setItem("latestAnalysis", JSON.stringify(analysisData));
       await fetchXrays();
       onAnalyzeXray(xrayId);
 
     } catch (err) {
-      console.error("Error analyzing X-ray:", err);
-      alert("Error analyzing X-ray");
+      setErrorMessage("Internal error during diagnostic processing.");
     } finally {
       setAnalyzingXrayId(null);
     }
   };
 
-  // ===== FORMAT DATE =====
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
+      month: "long", day: "numeric", year: "numeric",
     });
   };
 
-  // ===== LOADING STATE =====
-  if (!patient) return <div className="loading">Loading...</div>;
+  if (!patient && !errorMessage) return <div className="loading">Initializing clinical view...</div>;
 
   return (
     <div className={`page ${isDarkMode ? "dark" : "light"}`}>
       <div className="container">
 
-        {/* Patient Header Section */}
+        {/* Global Patient Overview */}
         <PatientDetailsHeader
           isDarkMode={isDarkMode}
           patient={patient}
@@ -208,15 +194,30 @@ export function PatientDetailsPage({
 
         <div className="card">
 
-          {/* XRay Upload Header */}
+          {/* Integrated Gallery Header with Error Passing */}
           <XRayGalleryHeader
             isDarkMode={isDarkMode}
             onUpload={handleUploadXray}
+            setErrorMessage={setErrorMessage} 
           />
 
-          {/* XRay Grid */}
+          {/* INLINE ERROR DISPLAY */}
+          {errorMessage && (
+            <div style={{
+              color: "#ef4444",
+              fontSize: "0.85rem",
+              marginTop: "-0.75rem",
+              marginBottom: "1.25rem",
+              fontWeight: "600",
+              paddingLeft: "0.5rem"
+            }}>
+                {errorMessage}
+            </div>
+          )}
+
+          {/* Dynamic X-Ray Grid Display */}
           {loading ? (
-            <div className="loading">Loading X-rays...</div>
+            <div className="loading">Updating diagnostic records...</div>
           ) : (
             <div className="grid">
               {xrays.map((xray) => (

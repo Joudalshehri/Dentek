@@ -11,12 +11,10 @@ from .views import (
     analyze_xray_view,
     get_xray_analysis,
     list_reports,
-    test_groq,
     update_report,
 )
 
 urlpatterns = [
-    path('test-groq/', test_groq, name="test_groq"),
     path("patients/create/", create_patient, name="create_patient"),
     path("xrays/upload/", upload_xray, name="upload_xray"),
     path("patients/", list_patients, name="list_patients"),

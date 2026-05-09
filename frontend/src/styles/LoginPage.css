@@ -261,3 +261,13 @@
 .contact-link:hover {
     text-decoration: underline;
 }
+.input-error {
+  border-color: #dc2626;
+}
+
+.input-error-message,
+.form-error {
+  color: #dc2626;
+  font-size: 14px;
+  margin-top: 6px;
+}

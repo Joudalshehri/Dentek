@@ -8,10 +8,14 @@ import { FeaturesSection } from "./FeaturesSection";
 import { Footer } from "./Footer";
 
 /**
- * LandingPage Component
- * * The main entry point for the landing page. It manages the theme state 
- * and provides smooth navigation to key sections of the page.
- * * @param {Function} onNavigateToLogin - Callback function to handle navigation to the login screen.
+ * LandingPage
+ *
+ * Renders the public landing page.
+ * It connects the shared sections together:
+ * Header, HeroSection, FeaturesSection, and Footer.
+ *
+ * Props:
+ * - onNavigateToLogin: switches the user to the login page.
  */
 export function LandingPage({ onNavigateToLogin }) {
   // Access theme state and toggle functionality from DarkModeContext
@@ -20,12 +24,14 @@ export function LandingPage({ onNavigateToLogin }) {
   /**
    * Smoothly scrolls the viewport to the 'Key Features' section.
    */
-  const scrollToFeatures = () => {
-    const section = document.getElementById('key-features');
-    if (section) {
-      section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  };
+ // Scrolls smoothly to the features section when the user clicks the CTA button.
+const scrollToFeatures = () => {
+  const section = document.getElementById("key-features");
+
+  if (section) {
+    section.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+};
 
   // Determine the CSS class based on the current theme
   const themeClass = isDarkMode ? 'dark-mode' : 'light-mode';

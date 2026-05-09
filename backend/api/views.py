@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authtoken.models import Token
-
+from django.contrib.auth.models import User
 from .models import Patient, XRay
 from .services.ai_pipeline import run_full_analysis
 from .services.analysis_result_builder import AnalysisResultBuilder
@@ -225,8 +225,29 @@ Return JSON only in this exact format:
 
 @api_view(["POST"])
 def login_view(request):
-    username = request.data.get("username")
-    password = request.data.get("password")
+    """
+    Authenticates the user using either username or email.
+    Returns a token if the credentials are valid.
+    """
+    username_or_email = request.data.get("username", "").strip()
+    password = request.data.get("password", "")
+
+    if not username_or_email or not password:
+        return Response(
+            {
+                "success": False,
+                "error": "Username/email and password are required",
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # If the input is an email, find the related user first.
+    user_obj = User.objects.filter(email__iexact=username_or_email).first()
+
+    if user_obj:
+        username = user_obj.username
+    else:
+        username = username_or_email
 
     user = authenticate(request, username=username, password=password)
 
@@ -244,7 +265,6 @@ def login_view(request):
         {"success": False, "error": "Invalid credentials"},
         status=status.HTTP_401_UNAUTHORIZED
     )
-
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

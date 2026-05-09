@@ -4,6 +4,7 @@ import { useDarkMode } from "../contexts/DarkModeContext";
 import "../../styles/AIAnalysisPage.css";
 import html2pdf from "html2pdf.js";
 
+
 export function AIAnalysisPage({
   xrayId,
   patientId,
@@ -13,46 +14,13 @@ export function AIAnalysisPage({
   analysisData,
   backText = "Back to Reports",
 }) {
-
-  // =========================
-  // Theme Context
-  // =========================
-
-  // Detects whether dark mode is enabled
   const { isDarkMode } = useDarkMode();
-
-
-  // =========================
-  // State Management
-  // =========================
-
-  // Stores analysis data returned from backend API
   const [data, setData] = useState(analysisData);
-
-  // Stores patient name fetched from database
   const [dbPatientName, setDbPatientName] = useState("");
-
-  // Stores editable doctor notes
   const [doctorNotes, setDoctorNotes] = useState("");
-
-  // Controls loading state while saving notes
   const [isSavingNotes, setIsSavingNotes] = useState(false);
 
-
-  // =========================
-  // Image References
-  // =========================
-
-  // Reference to the displayed x-ray image
   const imgRef = useRef(null);
-
-
-  // =========================
-  // Image Scaling State
-  // =========================
-
-  // Stores original and displayed image dimensions
-  // Used for scaling AI annotations correctly
   const [imageSize, setImageSize] = useState({
     naturalWidth: 1,
     naturalHeight: 1,
@@ -60,28 +28,15 @@ export function AIAnalysisPage({
     displayHeight: 1,
   });
 
-
-  // =========================
-  // Initial Data Loading
-  // =========================
-
-  // Loads analysis and patient data when component mounts
   useEffect(() => {
-    if (!analysisData && xrayId) {
+    if (!analysisData) {
       loadAnalysis();
     }
-
     if (patientId) {
       fetchPatientData();
     }
   }, [analysisData, xrayId, patientId]);
 
-
-  // =========================
-  // Sync Incoming Props
-  // =========================
-
-  // Updates local state whenever new analysis data is received
   useEffect(() => {
     if (analysisData) {
       setData(analysisData);
@@ -89,132 +44,46 @@ export function AIAnalysisPage({
     }
   }, [analysisData]);
 
-
-  // =========================
-  // API Request - Analysis Data
-  // =========================
-
-  // Fetches AI analysis report from backend API
   const loadAnalysis = async () => {
-
-    // Validation: ensure xrayId exists
-    if (!xrayId) {
-      console.error("X-Ray ID is missing");
-      return;
-    }
-
-    // Validation: ensure token exists
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      console.error("Authentication token is missing");
-      return;
-    }
-
     try {
       const response = await fetch(
         `http://127.0.0.1:8000/api/xrays/${xrayId}/analysis/`,
         {
           headers: {
-            Authorization: `Token ${token}`,
+            Authorization: `Token ${localStorage.getItem("token")}`,
           },
         }
       );
 
       if (response.ok) {
         const result = await response.json();
-
         setData(result);
-
-        // Loads saved doctor notes
         setDoctorNotes(result.doctor_notes || "");
-
       } else {
         console.error("Failed to load analysis:", response.status);
       }
-
     } catch (err) {
       console.error("Error loading analysis:", err);
     }
   };
 
-
-  // =========================
-  // API Request - Patient Data
-  // =========================
-
-  // Fetches patient information from backend API
   const fetchPatientData = async () => {
-
-    // Validation: ensure patientId exists
-    if (!patientId) {
-      console.error("Patient ID is missing");
-      return;
-    }
-
-    // Validation: ensure token exists
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      console.error("Authentication token is missing");
-      return;
-    }
-
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/patients/${patientId}/`,
-        {
-          headers: {
-            Authorization: `Token ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`http://127.0.0.1:8000/api/patients/${patientId}/`, {
+        headers: {
+          Authorization: `Token ${localStorage.getItem("token")}`,
+        },
+      })
 
       if (response.ok) {
         const patientData = await response.json();
-
-        // Stores patient name from database
-        setDbPatientName(
-          patientData.name || patientData.full_name || ""
-        );
-
-      } else {
-        console.error("Failed to fetch patient data");
+        setDbPatientName(patientData.name || patientData.full_name || "");
       }
-
     } catch (err) {
       console.error("Error fetching patient name:", err);
     }
   };
-
-
-  // =========================
-  // Save Doctor Notes
-  // =========================
-
-  // Sends updated doctor notes to backend API
   const handleSaveNotes = async () => {
-
-    // Validation: ensure xrayId exists
-    if (!xrayId) {
-      alert("X-Ray ID is missing");
-      return;
-    }
-
-    // Validation: ensure user is authenticated
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      alert("You must be logged in");
-      return;
-    }
-
-    // Validation: prevent empty notes
-    if (!doctorNotes.trim()) {
-      alert("Doctor notes cannot be empty");
-      return;
-    }
-
     setIsSavingNotes(true);
 
     try {
@@ -224,76 +93,39 @@ export function AIAnalysisPage({
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
+            Authorization: `Token ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
-            doctor_notes: doctorNotes.trim(),
+            doctor_notes: doctorNotes,
           }),
         }
       );
 
-      const result = await response.json();
-
       if (response.ok) {
-
-        // Success message after saving
-        alert(
-          result.message ||
-          "Doctor notes saved successfully"
-        );
-
+        alert("Doctor notes saved successfully");
       } else {
-
-        // Error message from backend
-        alert(
-          result.error ||
-          "Failed to save doctor notes"
-        );
+        alert("Failed to save doctor notes");
       }
-
     } catch (err) {
-
       console.error("Error saving notes:", err);
-
       alert("Server error while saving notes");
-
     } finally {
-
-      // Stops loading state
       setIsSavingNotes(false);
     }
   };
-
-
-  // =========================
-  // PDF Generation
-  // =========================
-
-  // Generates downloadable PDF report
   const handleDownloadPDF = async () => {
-
-    const element = document.querySelector(".report-card");
-
-    // Validation: ensure report exists
-    if (!element) {
-      alert("Report content not found");
-      return;
-    }
-
-    // Adds special styling for PDF export
     document.documentElement.classList.add("pdf-mode");
+    const element = document.querySelector(".report-card");
 
     const options = {
       margin: 0.4,
       filename: `AI_Report_${Date.now()}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
-
       html2canvas: {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
       },
-
       jsPDF: {
         unit: "in",
         format: "a4",
@@ -303,24 +135,13 @@ export function AIAnalysisPage({
 
     try {
       await html2pdf().set(options).from(element).save();
-
     } finally {
-
-      // Removes temporary PDF mode styling
       document.documentElement.classList.remove("pdf-mode");
     }
   };
 
-
-  // =========================
-  // Image Processing
-  // =========================
-
-  // Updates image dimensions after image loads
   const handleImageLoad = (e) => {
-
     const img = e.target;
-
     setImageSize({
       naturalWidth: img.naturalWidth || 1,
       naturalHeight: img.naturalHeight || 1,
@@ -329,148 +150,57 @@ export function AIAnalysisPage({
     });
   };
 
+  const scaleX = imageSize.displayWidth / imageSize.naturalWidth;
+  const scaleY = imageSize.displayHeight / imageSize.naturalHeight;
 
-  // Scaling factors used for annotations
-  const scaleX =
-    imageSize.displayWidth / imageSize.naturalWidth;
-
-  const scaleY =
-    imageSize.displayHeight / imageSize.naturalHeight;
-
-
-  // =========================
-  // Bounding Box Scaling
-  // =========================
-
-  // Scales lesion bounding boxes to match displayed image
   const scaleBBox = (bbox = [0, 0, 0, 0]) => {
-
-    // Validation: ensure bbox format is valid
-    if (!Array.isArray(bbox) || bbox.length !== 4) {
-      return [0, 0, 0, 0];
-    }
-
     const [x1, y1, x2, y2] = bbox;
-
-    return [
-      x1 * scaleX,
-      y1 * scaleY,
-      x2 * scaleX,
-      y2 * scaleY,
-    ];
+    return [x1 * scaleX, y1 * scaleY, x2 * scaleX, y2 * scaleY];
   };
 
-
-  // =========================
-  // Polygon Scaling
-  // =========================
-
-  // Scales impacted tooth polygon coordinates
   const scalePolygon = (polygon = []) => {
-
-    // Validation: ensure polygon is an array
-    if (!Array.isArray(polygon)) {
-      return [];
-    }
-
-    return polygon.map(([x, y]) => [
-      x * scaleX,
-      y * scaleY,
-    ]);
+    return polygon.map(([x, y]) => [x * scaleX, y * scaleY]);
   };
 
-
-  // =========================
-  // Report Status Helpers
-  // =========================
-
-  // Determines overall diagnostic result
   const getOverallResultText = (report) => {
+    const totalLesions = Number(report?.total_lesions || 0);
+    const totalImpacted = Number(report?.total_impacted || 0);
 
-    const totalLesions =
-      Number(report?.total_lesions || 0);
-
-    const totalImpacted =
-      Number(report?.total_impacted || 0);
-
-    if (totalImpacted > 0 && totalLesions > 0)
-      return "Impacted + Lesion";
-
-    if (totalImpacted > 0)
-      return "Impacted";
-
-    if (totalLesions > 0)
-      return "Periapical lesion";
-
+    if (totalImpacted > 0 && totalLesions > 0) return "Impacted + Lesion";
+    if (totalImpacted > 0) return "Impacted";
+    if (totalLesions > 0) return "Periapical lesion";
     return "Normal";
   };
 
-
-  // Returns CSS class for result badge styling
   const getOverallBadgeClass = (report) => {
+    const totalLesions = Number(report?.total_lesions || 0);
+    const totalImpacted = Number(report?.total_impacted || 0);
 
-    const totalLesions =
-      Number(report?.total_lesions || 0);
-
-    const totalImpacted =
-      Number(report?.total_impacted || 0);
-
-    if (totalImpacted > 0 && totalLesions > 0)
-      return "mixed";
-
-    if (totalImpacted > 0)
-      return "impacted";
-
-    if (totalLesions > 0)
-      return "danger";
-
+    if (totalImpacted > 0 && totalLesions > 0) return "mixed";
+    if (totalImpacted > 0) return "impacted";
+    if (totalLesions > 0) return "danger";
     return "normal";
   };
 
-
-  // Formats urgency text for display
   const formatUrgency = (urgency) => {
-
-    if (!urgency)
-      return "Not available";
-
-    return (
-      urgency.charAt(0).toUpperCase() +
-      urgency.slice(1)
-    );
+    if (!urgency) return "Not available";
+    return urgency.charAt(0).toUpperCase() + urgency.slice(1);
   };
 
-
-  // Returns CSS class for urgency badge styling
   const getUrgencyBadgeClass = (urgency) => {
-
-    if (urgency === "high")
-      return "urgency-high";
-
-    if (urgency === "moderate")
-      return "urgency-moderate";
-
-    if (urgency === "low")
-      return "urgency-low";
-
+    if (urgency === "high") return "urgency-high";
+    if (urgency === "moderate") return "urgency-moderate";
+    if (urgency === "low") return "urgency-low";
     return "urgency-unknown";
   };
 
-
-  // =========================
-  // Loading State
-  // =========================
-
-  // Displays loading screen until analysis data is ready
   if (!data) {
     return (
       <div className={`analysis-container ${isDarkMode ? "dark" : "light"}`}>
         <div className="analysis-content-wrapper">
           <p
             className="loading-text"
-            style={{
-              color: isDarkMode ? "white" : "#1f2937"
-            }}
+            style={{ color: isDarkMode ? "white" : "#1f2937" }}
           >
             Loading analysis...
           </p>
@@ -479,38 +209,255 @@ export function AIAnalysisPage({
     );
   }
 
-
-  // =========================
-  // Data Preparation
-  // =========================
-
-  // Builds full image URL from backend path
-  const imageUrl = data.image_url
-    ? `http://127.0.0.1:8000${data.image_url}`
-    : "";
-
-  // Extracts report data safely
+  const imageUrl = `http://127.0.0.1:8000${data.image_url}`;
   const report = data.report || {};
-
-  // Extracts recommendation data safely
   const recommendation = data.recommendation || {};
 
-  // Extracts lesion findings only
-  const lesionFindings =
-    (data.lesion_findings || data.findings || []).filter(
-      (f) =>
-        f.pred_label === "lesion" ||
-        f.classification?.pred_label === "lesion"
-    );
+  const lesionFindings = (data.lesion_findings || data.findings || []).filter(
+    (f) => f.pred_label === "lesion" || f.classification?.pred_label === "lesion"
+  );
 
-  // Extracts impacted tooth findings
-  const impactedFindings =
-    data.impacted_findings || [];
+  const impactedFindings = data.impacted_findings || [];
 
-  // Determines best available patient name
   const displayPatientName =
-    dbPatientName ||
-    initialPatientName ||
-    data?.patient_name ||
-    "Loading...";
+    dbPatientName || initialPatientName || data?.patient_name || "Loading...";
+
+  return (
+    <div className={`analysis-container ${isDarkMode ? "dark" : "light"}`}>
+      <div className="analysis-content-wrapper">
+        <div className="print-hidden">
+          <button
+            onClick={onBack}
+            className={`back-btn ${isDarkMode ? "dark" : "light"} group`}
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>{backText}</span>
+          </button>
+        </div>
+
+        <div className="report-card">
+          <div className="report-header">
+            <div>
+              <h1 className="brand-title">DENTEK</h1>
+              <p className="brand-subtitle">AI-Powered Dental Diagnostics</p>
+
+              <div className="patient-info-block">
+                <p className="patient-info-name">
+                  Patient Name: <span>{displayPatientName}</span>
+                </p>
+                <p className="patient-info-id">Patient ID: {patientId}</p>
+                <p className="patient-info-id">X-Ray ID: {xrayId}</p>
+              </div>
+            </div>
+          </div>
+
+          <section>
+            <h2 className="image-section-title">Radiographic Image</h2>
+
+            <div className="xray-wrapper">
+              <img
+                ref={imgRef}
+                src={imageUrl}
+                alt="X-Ray Analysis"
+                className="xray-main-img"
+                onLoad={handleImageLoad}
+              />
+
+              {lesionFindings.map((f, i) => {
+                const [x1, y1, x2, y2] = scaleBBox(f.bbox || [0, 0, 0, 0]);
+
+                return (
+                  <div
+                    key={`lesion-${i}`}
+                    className="lesion-box"
+                    style={{
+                      left: `${x1}px`,
+                      top: `${y1}px`,
+                      width: `${x2 - x1}px`,
+                      height: `${y2 - y1}px`,
+                    }}
+                  >
+                    <div className="lesion-label">Periapical lesion</div>
+                  </div>
+                );
+              })}
+
+              <svg className="overlay-svg">
+                {impactedFindings.map((f, i) => {
+                  const scaledPolygon = scalePolygon(f.polygon || []);
+                  if (!Array.isArray(scaledPolygon) || scaledPolygon.length < 4) {
+                    return null;
+                  }
+
+                  const points = scaledPolygon.map(([x, y]) => `${x},${y}`).join(" ");
+
+                  const centerX =
+                    scaledPolygon.reduce((sum, p) => sum + p[0], 0) / scaledPolygon.length;
+                  const centerY =
+                    scaledPolygon.reduce((sum, p) => sum + p[1], 0) / scaledPolygon.length;
+
+                  const offsetY = i * 18;
+
+                  return (
+                    <g key={`impacted-${i}`}>
+                      <polygon
+                        points={points}
+                        fill="rgba(37, 99, 235, 0.15)"
+                        stroke="#2563eb"
+                        strokeWidth="3"
+                      />
+                      <rect
+                        x={centerX - 37}
+                        y={centerY - 28 - offsetY}
+                        width="74"
+                        height="22"
+                        rx="6"
+                        fill="#2563eb"
+                      />
+                      <text
+                        x={centerX - 25}
+                        y={centerY - 14 - offsetY}
+                        fill="#ffffff"
+                        fontSize="12"
+                        fontWeight="600"
+                      >
+                        Impaction
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+          </section>
+
+          <section className="summary-section">
+            <h2 className="image-section-title">Summary</h2>
+
+            <div className="legend">
+              <div className="legend-item">
+                <span className="dot red"></span>
+                <span>Periapical lesion</span>
+              </div>
+
+              <div className="legend-item">
+                <span className="dot blue"></span>
+                <span>Impaction</span>
+              </div>
+
+              <div className="legend-item">
+                <span className="dot green"></span>
+                <span>Normal</span>
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <p className="summary-title">
+                {report.summary || "No summary available"}
+              </p>
+
+              <div className="summary-grid">
+                <div className="summary-item">
+                  <p className="item-label">Overall result</p>
+                  <span
+                    className={`status-badge ${getOverallBadgeClass(report)}`}
+                  >
+                    {getOverallResultText(report)}
+                  </span>
+                </div>
+
+                <div className="summary-item">
+                  <p className="item-label">Total lesions</p>
+                  <p className="item-value">{report.total_lesions ?? 0}</p>
+                </div>
+
+                <div className="summary-item">
+                  <p className="item-label">Total Impaction</p>
+                  <p className="item-value">{report.total_impacted ?? 0}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {recommendation && Object.keys(recommendation).length > 0 && (
+            <section className="recommendation-section">
+              <h2 className="image-section-title">Recommendation</h2>
+
+              <div className="recommendation-card">
+                <div className="recommendation-header">
+                  <div className="recommendation-main">
+                    <p className="recommendation-summary">
+                      {recommendation.summary || "No recommendation summary available"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="recommendation-body">
+                  <div className="recommendation-block">
+                    <p className="recommendation-label">Clinical recommendation</p>
+                    <p className="recommendation-text">
+                      {recommendation.recommendation_text ||
+                        "No recommendation text available"}
+                    </p>
+                  </div>
+
+                  {recommendation.next_steps &&
+                    recommendation.next_steps.length > 0 && (
+                      <div className="recommendation-block">
+                        <p className="recommendation-label">Suggested next steps</p>
+                        <ul className="recommendation-list">
+                          {recommendation.next_steps.map((step, index) => (
+                            <li key={index}>{step}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          <section className="doctor-notes-section">
+            <h2>Doctor Notes</h2>
+
+            <div className="notes-container">
+              <textarea
+                value={doctorNotes}
+                onChange={(e) => setDoctorNotes(e.target.value)}
+                placeholder="Write doctor's notes..."
+                className="doctor-notes-textarea"
+              />
+
+              <div className="notes-actions">
+                <button
+                  onClick={handleSaveNotes}
+                  disabled={isSavingNotes}
+                  className="notes-save-btn"
+                >
+                  {isSavingNotes ? "Saving..." : "Save Notes"}
+                </button>
+              </div>
+            </div>
+
+          </section>
+
+          <div
+            className="print-hidden"
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              marginTop: "1.5rem",
+            }}
+          >
+            <button
+              onClick={handleDownloadPDF}
+              className={`download-btn ${isDarkMode ? "dark" : "light"}`}
+            >
+              <Download className="w-4 h-4" />
+              <span>Download PDF Report</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

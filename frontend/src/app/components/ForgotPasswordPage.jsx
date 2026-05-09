@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { LoginHeader } from "./LoginHeader";
+import { InputField } from "./InputField";
 import { ImageSide } from "./ImageSide";
 import { Footer } from "./Footer";
 import { useDarkMode } from "../contexts/DarkModeContext";
@@ -9,17 +10,65 @@ import imageAsset from "@/assets/559b2b6797b2f31d3e60b52cb3f1f2393cf11a4c.png";
 import logo from "@/assets/0b7e942602c249fe1ebd2f413e4a81dfd2bc24e8.png";
 import "../../styles/LoginPage.css";
 
+/**
+ * ForgotPasswordPage
+ *
+ * Allows users to request a password reset link by entering their email.
+ * The email is validated before sending the request to the backend.
+ */
 export function ForgotPasswordPage({ onBackToLogin }) {
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("");
   const [loading, setLoading] = useState(false);
 
   const { isDarkMode, toggleDarkMode } = useDarkMode();
 
+  // Validates that the email is not empty and follows a valid email format.
+  const validateEmail = () => {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      setEmailError("Email is required.");
+      return false;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(trimmedEmail)) {
+      setEmailError("Email must be in this format: example@email.com");
+      return false;
+    }
+
+    setEmailError("");
+    return true;
+  };
+
+  // Updates email input and clears old validation/server messages.
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+
+    if (emailError) {
+      setEmailError("");
+    }
+
+    if (message) {
+      setMessage("");
+      setMessageType("");
+    }
+  };
+
+  // Sends a password reset request to the backend.
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+
+    if (loading) return;
+
     setMessage("");
+    setMessageType("");
+
+    if (!validateEmail()) return;
+
+    setLoading(true);
 
     try {
       const response = await fetch(
@@ -29,17 +78,21 @@ export function ForgotPasswordPage({ onBackToLogin }) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email: email.trim() }),
         }
       );
 
       if (response.ok) {
         setMessage("Password reset link has been sent to your email.");
+        setMessageType("success");
       } else {
-        setMessage("Failed to send reset link. Please try again.");
+        setMessage("Failed to send reset link. Please check the email and try again.");
+        setMessageType("error");
       }
     } catch (error) {
+      console.error("Password reset error:", error);
       setMessage("Server error. Please make sure Django is running.");
+      setMessageType("error");
     } finally {
       setLoading(false);
     }
@@ -66,29 +119,27 @@ export function ForgotPasswordPage({ onBackToLogin }) {
             </div>
 
             <form onSubmit={handleSubmit} noValidate>
-              <div className="input-group">
-                <label>Email Address</label>
-                <input
-                  type="email"
-                  className="input-field"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+              <InputField
+                label="Email Address"
+                type="email"
+                value={email}
+                onChange={handleEmailChange}
+                placeholder="Enter your email"
+                error={emailError}
+              />
 
               {message && (
-                <p className="reset-message">
+                <p
+                  className={`reset-message ${
+                    messageType === "success" ? "success-message" : "error-message"
+                  }`}
+                  role="alert"
+                >
                   {message}
                 </p>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="submit-btn"
-              >
+              <button type="submit" disabled={loading} className="submit-btn">
                 {loading ? "Sending..." : "Send Reset Link"}
               </button>
 

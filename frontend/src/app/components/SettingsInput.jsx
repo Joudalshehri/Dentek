@@ -7,11 +7,7 @@ import React from "react";
  * @param {boolean} isDarkMode - Flag to toggle between dark and light themes.
  * @param {object} props - Additional HTML input attributes (type, value, onChange, etc.).
  */
-export const SettingsInput = ({
-  label,
-  isDarkMode,
-  ...props
-}) => {
+export const SettingsInput = ({ label, isDarkMode, ...props }) => {
   // Determine the active theme class based on the mode
   const themeClass = isDarkMode ? "dark" : "light";
 

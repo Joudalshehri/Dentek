@@ -1,7 +1,12 @@
 import { Plus, X } from "lucide-react";
-
 import "../../styles/AddPatientModal.css";
 
+/**
+ * AddPatientModal Component
+ * 
+ * A reusable modal dialog for registering new patients.
+ * Features: Theme-aware styling, dynamic field rendering, and validation error handling.
+ */
 export function AddPatientModal({
   isOpen,
   isDarkMode,
@@ -11,10 +16,12 @@ export function AddPatientModal({
   onClose,
   onSubmit,
 }) {
+  // Prevent rendering if the modal is not active
   if (!isOpen) return null;
 
   const themeClass = isDarkMode ? "dark" : "light";
 
+  // Configuration for form fields to maintain a DRY (Don't Repeat Yourself) structure
   const fields = [
     {
       id: "patient_id",
@@ -50,15 +57,15 @@ export function AddPatientModal({
   return (
     <div
       className={`modal-overlay ${themeClass}`}
-      onClick={onClose}
+      onClick={onClose} // Closes modal when clicking on the backdrop
     >
       <div
         className={`modal-content ${themeClass}`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()} // Prevents closing when clicking inside the content
       >
+        {/* Header Section */}
         <div className="modal-header">
           <h2>Add New Patient</h2>
-
           <button
             type="button"
             onClick={onClose}
@@ -69,13 +76,16 @@ export function AddPatientModal({
           </button>
         </div>
 
+        {/* Form Section */}
         <form onSubmit={onSubmit} noValidate>
+          {/* General Form-level Error Message */}
           {errors.form && (
             <p className="form-error">
               {errors.form}
             </p>
           )}
 
+          {/* Dynamic Input Rendering */}
           {fields.map((field) => (
             <div
               key={field.id}
@@ -104,6 +114,7 @@ export function AddPatientModal({
                 }`}
               />
 
+              {/* Inline Validation Feedback */}
               {errors[field.id] && (
                 <p className="field-error">
                   {errors[field.id]}
@@ -112,6 +123,7 @@ export function AddPatientModal({
             </div>
           ))}
 
+          {/* Action Buttons */}
           <div className="modal-actions">
             <button
               type="button"

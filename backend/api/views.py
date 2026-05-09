@@ -251,6 +251,11 @@ def login_view(request):
 def profile_view(request):
     user = request.user
 
+    """
+    Fetch the profile details of the currently logged-in user.
+    Access restricted to authenticated users only.
+    """
+
     return Response({
         "username": user.username,
         "email": user.email,
@@ -259,60 +264,144 @@ def profile_view(request):
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def update_profile_view(request):
+    """
+    Update user profile with manual validation logic.
+    Ensures data integrity by checking constraints before persistence.
+    """
     user = request.user
+    data = request.data
+    errors = {}
 
-    user.username = request.data.get("username", user.username)
-    user.email = request.data.get("email", user.email)
-    user.save()
+    # Extract and sanitize input data (Strip whitespace)
+    username = data.get("username", user.username).strip()
+    email = data.get("email", user.email).strip()
 
-    return Response({
-        "message": "Updated successfully",
-        "username": user.username,
-        "email": user.email,
-    })
+    # --- Username Validation ---
+    # Ensure the username is not empty or composed solely of whitespace
+    if not username:
+        errors["username"] = "Username is required"
 
+    # --- Email Validation (Mirrors Frontend Logic) ---
+    if not email:
+        errors["email"] = "Email address is required"
+    else:
+        # Check for basic structure: existence of '@' and '.'
+        if "@" not in email or "." not in email:
+            errors["email"] = "Please enter a complete email (e.g., example@domain.com)"
+        
+        # Ensure the last dot occurs after the '@' symbol
+        elif email.rfind(".") < email.find("@"):
+            errors["email"] = "Invalid email structure"
+            
+        # Regex check for standard email format validation
+        elif not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+            errors["email"] = "Email domain is incomplete or invalid"
+
+    # --- Response Handling ---
+    # If validation dictionary is not empty, return a 400 Bad Request
+    if errors:
+        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Update user instance and commit changes to the database
+        user.username = username
+        user.email = email
+        user.save()
+        
+        return Response({
+            "message": "Updated successfully",
+            "username": user.username,
+            "email": user.email,
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        # Handle unexpected database or server-side errors
+        return Response(
+            {"detail": "A server error occurred during update."}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_patient(request):
+    """
+    Handle patient registration with comprehensive server-side validation.
+    Ensures all required fields meet structural and business logic constraints.
+    """
     data = request.data
+    errors = {}
 
-    birth_date_value = data.get("birthDate") or data.get("birth_date")
-    patient_code = data.get("patient_id")
+    # Extracting data fields
+    patient_code = data.get("patient_id", "").strip()
+    full_name = data.get("name", "").strip()
+    birth_date = data.get("birthDate") or data.get("birth_date")
+    phone = data.get("phone", "").strip()
+    email = data.get("email", "").strip()
 
+    # --- National ID (patient_id) Validation ---
     if not patient_code:
-        return Response({"error": "patient_id is required"}, status=400)
+        errors["patient_id"] = "National ID is required"
+    elif Patient.objects.filter(patient_id=patient_code).exists():
+        errors["patient_id"] = "Patient ID already exists."
 
-    if Patient.objects.filter(patient_id=patient_code).exists():
-        return Response({"patient_id": "Patient ID already exists."}, status=400)
+    # --- Full Name Validation ---
+    if not full_name:
+        errors["name"] = "Full name is required"
 
-    patient = Patient.objects.create(
-        user=request.user,
-        patient_id=patient_code,
-        name=data.get("name"),
-        birth_date=birth_date_value,
-        phone=data.get("phone"),
-        email=data.get("email"),
-    )
+    # --- Date of Birth Validation ---
+    if not birth_date:
+        errors["birthDate"] = "Date of birth is required"
 
-    return Response(
-        {
-            "id": patient.id,
-            "patient_id": patient.patient_id,
-            "name": patient.name,
-        },
-        status=status.HTTP_201_CREATED,
-    )
+    # --- Phone Number Validation ---
+    if not phone:
+        errors["phone"] = "Phone number is required"
+    elif not re.match(r"^05\d{8}$", phone):
+        errors["phone"] = "Invalid phone format (e.g., 05xxxxxxxx)"
 
+    # --- Email Validation ---
+    if email: # Email is often optional, but if provided, it must be valid
+        email_pattern = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
+        if not re.match(email_pattern, email):
+            errors["email"] = "Please enter a valid email address"
 
+    # --- Early Return if Validation Fails ---
+    if errors:
+        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Create and persist the patient record
+        patient = Patient.objects.create(
+            user=request.user,
+            patient_id=patient_code,
+            name=full_name,
+            birth_date=birth_date,
+            phone=phone,
+            email=email,
+        )
+
+        return Response(
+            {
+                "id": patient.id,
+                "patient_id": patient.patient_id,
+                "name": patient.name,
+                "message": "Patient registered successfully"
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    except Exception as e:
+        # Catch unexpected integrity or database errors
+        return Response(
+            {"form": "An unexpected error occurred during patient registration."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
 # GET: Retrieve all patients for the logged-in user
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_patients(request):
 
-    patients = Patient.objects.filter(
-        user=request.user
-    ).order_by("-id")
+    patients = Patient.objects.filter( user=request.user).order_by("-id")
 
     data = []
 
@@ -328,7 +417,6 @@ def list_patients(request):
         })
 
     return Response(data)
-
 
 
 @api_view(["GET"])
@@ -505,18 +593,21 @@ def analyze_xray_view(request, xray_id):
 @permission_classes([IsAuthenticated])
 def get_xray_analysis(request, xray_id):
     try:
+        # Securely fetch record ensuring ownership via patient-user relationship
         xray = XRay.objects.select_related("patient").get(
             id=xray_id,
             patient__user=request.user
         )
     except XRay.DoesNotExist:
+        # Handle record absence or unauthorized access attempts
         return Response({"error": "XRay not found"}, status=404)
 
+    # Verify that the diagnostic analysis data is available
     if not xray.analysis_result:
         return Response({"error": "No analysis found for this xray"}, status=404)
 
+    # Merge automated analysis results with clinical annotations
     data = xray.analysis_result.copy()
-
     data["doctor_notes"] = xray.doctor_notes
     data["edited_report"] = xray.edited_report
 
@@ -525,6 +616,9 @@ def get_xray_analysis(request, xray_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_reports(request):
+    """
+    List all reports for a specific patient.
+    """
     xrays = XRay.objects.filter(
         patient__user=request.user,
         analysis_result__isnull=False

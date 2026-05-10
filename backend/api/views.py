@@ -4,20 +4,20 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
-from .models import Patient, XRay
+from .models import Patient, XRay, DoctorPatient 
 from .services.ai_pipeline import run_full_analysis
 from .services.analysis_result_builder import AnalysisResultBuilder
-
-
+from .models import Patient, XRay, Report
 from django.contrib.auth import authenticate
 #from django.http import JsonResponse
 
+
+import os
 import re
 from datetime import date
 from django.utils.dateparse import parse_date
 
 import json
-import os
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -119,8 +119,9 @@ def create_patient(request):
         errors["patient_id"] = "National ID is required."
     elif not re.match(r"^\d{10}$", patient_code):
         errors["patient_id"] = "National ID must be exactly 10 digits."
-    elif Patient.objects.filter(user=request.user, patient_id=patient_code).exists():
-        errors["patient_id"] = "A patient with this ID already exists."
+
+    elif Patient.objects.filter(national_id=patient_code, doctors=request.user).exists():
+        errors["patient_id"] = "This patient is already in your list."
 
     # 2. Name Validation
     if not full_name:
@@ -157,21 +158,24 @@ def create_patient(request):
         return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        # Create instance linked to the current logged-in user
-        patient = Patient.objects.create(
-            user=request.user,
-            patient_id=patient_code,
-            name=full_name,
-            birth_date=birth_date,
-            phone=phone,
-            email=email,
+
+        patient, created = Patient.objects.get_or_create(
+            national_id=patient_code,
+            defaults={
+                'full_name': full_name,
+                'phone_number': phone,
+                'email': email,
+                'birth_date': birth_date
+            }
         )
+
+        DoctorPatient.objects.get_or_create(doctor=request.user, patient=patient)
 
         return Response(
             {
                 "id": patient.id,
-                "patient_id": patient.patient_id,
-                "name": patient.name,
+                "patient_id": patient.national_id,
+                "name": patient.full_name,
                 "message": "Patient registered successfully",
             },
             status=status.HTTP_201_CREATED,
@@ -192,20 +196,22 @@ def get_patient(request, patient_id):
 
     try:
         # Get patient by ID and make sure it belongs to the current user
-        patient = Patient.objects.get(id=patient_id, user=request.user)
+        # Updated: Filter by 'doctors' relationship as defined in the Model
+        patient = Patient.objects.get(id=patient_id, doctors=request.user)
 
     except Patient.DoesNotExist:
         # Return 404 if patient does not exist or does not belong to user
         return Response({"error": "Patient not found"}, status=404)
 
     # Return patient details to the frontend
+    # Updated: Fields matched with Patient Model (national_id, full_name, phone_number)
     return Response({
         "id": patient.id,
-        "patient_id": patient.patient_id,
-        "name": patient.name,
+        "patient_id": patient.national_id,
+        "name": patient.full_name,
         "age": patient.age,
         "birth_date": patient.birth_date,
-        "phone": patient.phone,
+        "phone": patient.phone_number,
         "email": patient.email,
     })
 
@@ -215,23 +221,24 @@ def get_patient(request, patient_id):
 @permission_classes([IsAuthenticated])
 def list_patients(request):
 
-    patients = Patient.objects.filter( user=request.user).order_by("-id")
-
+    patients = Patient.objects.filter(
+        doctors=request.user
+    ).order_by("-id")
     data = []
 
     for p in patients:
+        # Updated: Fields matched with Patient Model (national_id, full_name, phone_number)
         data.append({
             "id": p.id,
-            "patient_id": p.patient_id,
-            "name": p.name,
+            "patient_id": p.national_id,
+            "name": p.full_name,
             "age": p.age,
             "birth_date": p.birth_date,
-            "phone": p.phone,
+            "phone": p.phone_number,
             "email": p.email,
         })
 
     return Response(data)
-
 
 
 @api_view(["POST"])
@@ -271,23 +278,27 @@ def upload_xray(request):
 
     try:
         # Make sure the patient exists and belongs to the current user
-        patient = Patient.objects.get(id=patient_id, user=request.user)
+        # Updated: Using 'doctors' instead of 'user'
+        patient = Patient.objects.get(id=patient_id, doctors=request.user)
 
     except Patient.DoesNotExist:
         return Response({"error": "Patient not found"}, status=404)
 
     # Create new X-ray record linked to the patient
+    # Updated: Added 'doctor' field to track who uploaded it as per your model
     xray = XRay.objects.create(
         patient=patient,
+        doctor=request.user,
         image=image
     )
 
     # Return uploaded X-ray information
+    # Updated: Using 'uploaded_at' to match XRay model
     return Response(
         {
             "id": xray.id,
             "image_url": xray.image.url,
-            "created_at": xray.created_at,
+            "created_at": xray.uploaded_at,
             "has_analysis": False,
         },
         status=status.HTTP_201_CREATED,
@@ -310,26 +321,30 @@ def list_xrays(request):
 
     try:
         # Make sure the patient belongs to the authenticated user
-        patient = Patient.objects.get(id=patient_id, user=request.user)
+        # Updated: Using 'doctors' instead of 'user'
+        patient = Patient.objects.get(id=patient_id, doctors=request.user)
 
     except Patient.DoesNotExist:
         return Response({"error": "Patient not found"}, status=404)
 
     # Get patient's X-rays, newest first
-    xrays = XRay.objects.filter(patient=patient).order_by("-created_at")
+    # Updated: Using 'uploaded_at' to match XRay model
+    xrays = XRay.objects.filter(patient=patient).order_by("-uploaded_at")
 
     data = []
 
     # Format X-ray data for frontend
     for x in xrays:
+        # Updated: Using 'uploaded_at' and checking for 'report' relation
         data.append({
             "id": x.id,
             "image_url": x.image.url,
-            "created_at": x.created_at,
-            "has_analysis": x.analysis_result is not None,
+            "created_at": x.uploaded_at,
+            "has_analysis": hasattr(x, 'report'),
         })
 
     return Response(data)
+
 
 
 @api_view(["POST"])
@@ -340,45 +355,39 @@ def analyze_xray_view(request, xray_id):
     """
 
     try:
-        # Get X-ray and its patient, ensuring ownership by current user
         xray = XRay.objects.select_related("patient").get(
             id=xray_id,
-            patient__user=request.user
+            patient__doctors=request.user
         )
 
     except XRay.DoesNotExist:
         return Response({"error": "XRay not found"}, status=404)
 
-    # Validate that the X-ray has an image field
     if not xray.image:
         return Response({"error": "No image found for this XRay"}, status=400)
 
-    # Validate that the image file exists on the server
     if not os.path.exists(xray.image.path):
         return Response({"error": "XRay image file does not exist"}, status=404)
 
-    # Run the full AI analysis pipeline
     result = run_full_analysis(xray.image.path)
 
-    # Extract analysis sections safely
-    report = result.get("report", {})
+    report_data = result.get("report", {})
     findings = result.get("findings", [])
     impacted_findings = result.get("impacted_findings", [])
     lesion_findings = result.get("lesion_findings", result.get("findings", []))
 
-    # Generate recommendation based on AI findings
     recommendation = generate_dental_recommendation(
-        report=report,
+        report=report_data,
         findings=findings,
         impacted_findings=impacted_findings,
         lesion_findings=lesion_findings,
     )
 
-    # Build final structured analysis result
-    xray.analysis_result = (
+    # Build final structured analysis result using AnalysisResultBuilder
+    full_ai_data = (
         AnalysisResultBuilder(xray)
         .add_basic_info()
-        .add_report(report)
+        .add_report(report_data)
         .add_findings(findings)
         .add_impacted_findings(impacted_findings)
         .add_lesion_findings(lesion_findings)
@@ -386,39 +395,59 @@ def analyze_xray_view(request, xray_id):
         .build()
     )
 
-    # Save analysis result in database
+    # This is needed so frontend can display the X-ray image
+    full_ai_data["image_url"] = xray.image.url if xray.image else ""
+
+    # Optional: also save result inside XRay model if you still use analysis_result field
+    xray.analysis_result = full_ai_data
     xray.save()
 
-    # Return final analysis result to frontend
-    return Response(xray.analysis_result, status=200)
+    # Save analysis result in Report model
+    report_obj, created = Report.objects.update_or_create(
+        xray=xray,
+        defaults={
+            "ai_result_data": full_ai_data,
+            "is_confirmed": False
+        }
+    )
 
+    return Response(report_obj.ai_result_data, status=status.HTTP_200_OK)
 
 # ------------------------------
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_xray_analysis(request, xray_id):
+    """
+    Retrieve the AI analysis and doctor notes for a specific X-ray.
+    """
     try:
-        # Securely fetch record ensuring ownership via patient-user relationship
+        # Securely fetch record ensuring ownership via patient-doctors relationship
+        # Updated: Using 'patient__doctors' to match your ManyToMany model
         xray = XRay.objects.select_related("patient").get(
             id=xray_id,
-            patient__user=request.user
+            patient__doctors=request.user
         )
     except XRay.DoesNotExist:
         # Handle record absence or unauthorized access attempts
         return Response({"error": "XRay not found"}, status=404)
 
-    # Verify that the diagnostic analysis data is available
-    if not xray.analysis_result:
+    # Verify that the diagnostic analysis data is available via the Report model
+    # Updated: Checking for the related 'report' object as defined in your Report model
+    if not hasattr(xray, 'report'):
         return Response({"error": "No analysis found for this xray"}, status=404)
 
+    # Access the report object
+    report = xray.report
+
     # Merge automated analysis results with clinical annotations
-    data = xray.analysis_result.copy()
-    data["doctor_notes"] = xray.doctor_notes
-    data["edited_report"] = xray.edited_report
+    # Updated: Using 'ai_result_data' and 'doctor_notes' from the Report model
+    data = report.ai_result_data.copy() if report.ai_result_data else {}
+    data["doctor_notes"] = report.doctor_notes
+    data["is_confirmed"] = report.is_confirmed
+    data["updated_at"] = report.updated_at
+
 
     return Response(data, status=200)
-
-
 
 def make_json_safe(obj):
     try:
@@ -587,30 +616,36 @@ def list_reports(request):
     """
     List all reports for a specific patient.
     """
+    # Updated: Filter by patient__doctors and check for existing report relationship
+    # Using uploaded_at instead of created_at
     xrays = XRay.objects.filter(
-        patient__user=request.user,
-        analysis_result__isnull=False
-    ).select_related("patient").order_by("-created_at")
+        patient__doctors=request.user,
+        report__isnull=False
+    ).select_related("patient", "report").order_by("-uploaded_at")
 
     data = []
     for xray in xrays:
-        report = xray.analysis_result.get("report", {}) if xray.analysis_result else {}
-        recommendation = xray.analysis_result.get("recommendation", {}) if xray.analysis_result else {}
+        # Access data from the related Report model
+        report_obj = xray.report
+        ai_data = report_obj.ai_result_data or {}
+        
+        report_content = ai_data.get("report", {})
+        recommendation = ai_data.get("recommendation", {})
 
-        total_lesions = report.get("total_lesions", 0)
-        total_impacted = report.get("total_impacted", 0)
+        total_lesions = report_content.get("total_lesions", 0)
+        total_impacted = report_content.get("total_impacted", 0)
 
         data.append({
             "id": xray.id,
             "patient_id": xray.patient.id,
-            "patient_code": xray.patient.patient_id,
-            "patient_name": xray.patient.name,
+            "patient_code": xray.patient.national_id, # Updated field name
+            "patient_name": xray.patient.full_name,   # Updated field name
             "patient_age": xray.patient.age,
-            "date": xray.created_at.strftime("%Y-%m-%d %H:%M"),
-            "status": "Completed",
+            "date": xray.uploaded_at.strftime("%Y-%m-%d %H:%M"), # Updated field name
+            "status": "Confirmed" if report_obj.is_confirmed else "Pending",
             "findings": total_lesions + total_impacted,
-            "summary": report.get("summary", ""),
-            "overall_label": report.get("overall_label", "normal"),
+            "summary": report_content.get("summary", ""),
+            "overall_label": report_content.get("overall_label", "normal"),
             "total_lesions": total_lesions,
             "total_impacted": total_impacted,
             "recommendation": recommendation,
@@ -621,7 +656,9 @@ def list_reports(request):
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def update_report(request, xray_id):
-
+    """
+    Update doctor notes for a specific report.
+    """
     # Validate xray_id
     if not isinstance(xray_id, int) or xray_id <= 0:
         return Response(
@@ -631,14 +668,22 @@ def update_report(request, xray_id):
 
     # Get the X-ray and make sure it belongs to the logged-in user
     try:
+        # Updated: Filter by patient__doctors
         xray = XRay.objects.select_related("patient").get(
             id=xray_id,
-            patient__user=request.user
+            patient__doctors=request.user
         )
 
     except XRay.DoesNotExist:
         return Response(
             {"error": "XRay not found."},
+            status=404
+        )
+
+    # Check if a report exists for this X-ray
+    if not hasattr(xray, 'report'):
+        return Response(
+            {"error": "No report exists for this XRay to update."},
             status=404
         )
 
@@ -676,18 +721,17 @@ def update_report(request, xray_id):
             status=400
         )
 
-    # Update doctor notes
-    xray.doctor_notes = doctor_notes
-
-    # Save changes
-    xray.save()
+    # Update doctor notes in the Report model
+    report = xray.report
+    report.doctor_notes = doctor_notes
+    report.is_confirmed = True # Optionally set to confirmed when notes are added
+    report.save()
 
     # Return success response
     return Response({
         "message": "Notes updated successfully.",
-        "doctor_notes": xray.doctor_notes,
+        "doctor_notes": report.doctor_notes,
     }, status=200)
-
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

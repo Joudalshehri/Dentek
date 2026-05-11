@@ -152,13 +152,19 @@
 
     color: #374151;
 }
-
-/* ===== Responsive ===== */
-
-@media (max-width: 768px) {
-
-    .inputs-grid {
-        grid-template-columns: 1fr;
-    }
-
+.success-message {
+  color: #22c55e;
+  font-size: 12px;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.error-message {
+  color: #ff4d4d;
+  font-size: 12px;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }

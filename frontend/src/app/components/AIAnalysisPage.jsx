@@ -86,7 +86,7 @@ export function AIAnalysisPage({
       console.error("Error fetching patient name:", err);
     }
   };
-  
+
   const handleSaveNotes = async () => {
     setIsSavingNotes(true);
 
@@ -106,10 +106,17 @@ export function AIAnalysisPage({
       );
 
       if (response.ok) {
-        setNotesMessage("Doctor notes saved successfully");
+
+        const data = await response.json();
+
+        setNotesMessage(data.message);
         setNotesError(false);
+
       } else {
-        setNotesMessage("Doctor notes must contain text only. Numbers are not allowed.");
+
+        const data = await response.json();
+
+        setNotesMessage(data.error);
         setNotesError(true);
       }
 
@@ -469,7 +476,7 @@ export function AIAnalysisPage({
             </div>
           </section>
 
-                   <div
+          <div
             className="print-hidden"
             style={{
               display: "flex",

@@ -10,8 +10,6 @@ from .services.analysis_result_builder import AnalysisResultBuilder
 from .models import Patient, XRay, Report
 from django.contrib.auth import authenticate
 #from django.http import JsonResponse
-
-
 import os
 import re
 from datetime import date
@@ -488,7 +486,7 @@ def get_xray_analysis(request, xray_id):
 
 def make_json_safe(obj):
     try:
-        import numpy as np
+       import numpy as np 
     except ImportError:
         np = None
 
@@ -696,6 +694,7 @@ def update_report(request, xray_id):
     """
     Update doctor notes for a specific report.
     """
+
     # Validate xray_id
     if not isinstance(xray_id, int) or xray_id <= 0:
         return Response(
@@ -705,7 +704,6 @@ def update_report(request, xray_id):
 
     # Get the X-ray and make sure it belongs to the logged-in user
     try:
-        # Updated: Filter by patient__doctors
         xray = XRay.objects.select_related("patient").get(
             id=xray_id,
             patient__doctors=request.user
@@ -718,7 +716,7 @@ def update_report(request, xray_id):
         )
 
     # Check if a report exists for this X-ray
-    if not hasattr(xray, 'report'):
+    if not hasattr(xray, "report"):
         return Response(
             {"error": "No report exists for this XRay to update."},
             status=404
@@ -730,7 +728,7 @@ def update_report(request, xray_id):
     # Validate doctor_notes existence
     if doctor_notes is None:
         return Response(
-            {"error": "Doctor notes are required. Please enter notes before saving."},
+            {"error": "Doctor notes are required."},
             status=400
         )
 
@@ -744,27 +742,34 @@ def update_report(request, xray_id):
     # Remove spaces from beginning and end
     doctor_notes = doctor_notes.strip()
 
-    # Validate empty notes
+   # Allow empty notes but show a warning message
     if doctor_notes == "":
+    
+      report = xray.report
+      report.doctor_notes = ""
+      report.is_confirmed = True
+      report.save()
+
+      return Response({
+        "message": "Report saved without doctor notes.",
+        "doctor_notes": report.doctor_notes,
+        "warning": True
+     }, status=200)
+
+    # Validate numeric-only notes
+    elif doctor_notes.isdigit():
         return Response(
-            {"error": "Doctor notes cannot be empty."},
+            {"error": "Doctor notes cannot contain only numbers."},
             status=400
         )
 
-    # Prevent notes that contain only numbers
-    if doctor_notes.isdigit():
-        return Response(
-            {"error": "Doctor notes cannot contain only numbers. Please write a real note."},
-            status=400
-        )
-
-    # Update doctor notes in the Report model
+    # Update report
     report = xray.report
     report.doctor_notes = doctor_notes
-    report.is_confirmed = True # Optionally set to confirmed when notes are added
+    report.is_confirmed = True
     report.save()
 
-    # Return success response
+    # Success response
     return Response({
         "message": "Notes updated successfully.",
         "doctor_notes": report.doctor_notes,

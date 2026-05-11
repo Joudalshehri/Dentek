@@ -1,113 +1,184 @@
 import { useState } from "react";
-import { Save, AlertCircle } from "lucide-react"; // أضفنا AlertCircle للتحذير
+import { Save, AlertCircle, CheckCircle } from "lucide-react";
 import { useDarkMode } from "../contexts/DarkModeContext";
 import { AvatarSection } from "./AvatarSection";
 import { SettingsInput } from "./SettingsInput";
 import { CustomHeader } from "./CustomHeader";
 import "../../styles/SettingsPage.css";
 
-/**
- * SettingsPage Component
- * 
- * Manages user profile settings and state persistence.
- * Includes localized validation logic to ensure data quality 
- * before synchronizing with the remote API.
- */
 export function SettingsPage({ profile, setProfile }) {
+
+  // Get dark mode state from context
   const { isDarkMode } = useDarkMode();
+
+  // Apply theme class dynamically
   const themeClass = isDarkMode ? "dark" : "light";
+
+  // Loading state while saving profile
   const [isSaving, setIsSaving] = useState(false);
 
-  // New state hooks for validation messages
+  // Validation error states
   const [userNameError, setUserNameError] = useState("");
   const [emailError, setEmailError] = useState("");
 
+  // Success message state
+  const [successMessage, setSuccessMessage] = useState("");
+
+  /**
+   * Generate authentication headers
+   * using the stored token
+   */
   const getAuthHeaders = () => ({
     "Content-Type": "application/json",
     Authorization: `Token ${localStorage.getItem("token")}`,
   });
 
+  /**
+   * Handle input value changes
+   */
   const handleInputChange = (field, value) => {
     setProfile((prev) => ({
       ...prev,
       [field]: value,
     }));
+
+    // Remove success message after editing
+    setSuccessMessage("");
   };
 
-/**
-   * Performs advanced data validation and initiates the persistence sequence.
-   * Ensures the email conforms to standard formatting (e.g., user@domain.com)
-   * and prevents submission of incomplete profile data.
+  /**
+   * Validate profile data
+   * and send update request
    */
   const handleSaveProfile = async () => {
-    // Reset error states before starting validation logic
+
+    // Reset messages before validation
     setUserNameError("");
     setEmailError("");
+    setSuccessMessage("");
 
     let isValid = true;
 
-    // 1. Username Validation: Prevent empty or whitespace-only names
+    /**
+     * Username validation
+     * Prevent empty usernames
+     */
     if (profile.username.trim() === "") {
       setUserNameError("Username is required");
       isValid = false;
     }
 
-    // 2. Comprehensive Email Validation
+    /**
+     * Email validation
+     */
     const emailValue = profile.email.trim();
-    
+
+    // Empty email validation
     if (emailValue === "") {
       setEmailError("Email address is required");
       isValid = false;
-    } 
-    // Check for the presence of '@' and a '.' after it
-    else if (emailValue.includes("@") === false || emailValue.includes(".") === false) {
-      setEmailError("Please enter a complete email (e.g., example@domain.com)");
+    }
+
+    // Basic email structure validation
+    else if (
+      emailValue.includes("@") === false ||
+      emailValue.includes(".") === false
+    ) {
+      setEmailError(
+        "Please enter a complete email (e.g., example@domain.com)"
+      );
       isValid = false;
-    } 
-    // Ensure the dot comes after the @ symbol
-    else if (emailValue.lastIndexOf(".") < emailValue.indexOf("@")) {
+    }
+
+    // Ensure dot appears after @
+    else if (
+      emailValue.lastIndexOf(".") < emailValue.indexOf("@")
+    ) {
       setEmailError("Invalid email structure");
       isValid = false;
     }
-    // Ensure there is at least something after the last dot
-    else if (emailValue.split(".").pop().length < 2) {
+
+    // Ensure domain extension exists
+    else if (
+      emailValue.split(".").pop().length < 2
+    ) {
       setEmailError("Email domain is incomplete");
       isValid = false;
     }
 
-    // 3. Execution logic: Only proceed if the form passes all structural checks
+    /**
+     * Proceed only if validation succeeds
+     */
     if (isValid === true) {
-      setIsSaving(true);
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/profile/update/", {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(profile),
-        });
 
+      // Activate loading state
+      setIsSaving(true);
+
+      try {
+
+        // Send update request to backend
+        const res = await fetch(
+          "http://127.0.0.1:8000/api/profile/update/",
+          {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify(profile),
+          }
+        );
+
+        /**
+         * Successful response
+         */
         if (res.ok) {
+
           const updated = await res.json();
-          
-          // Immediate state synchronization for UI consistency
+
+          // Update local profile state
           setProfile({
             username: updated.username,
             email: updated.email,
           });
-          
-          alert("Profile updated successfully!");
+
+          // Show success message
+          setSuccessMessage(
+            "Profile updated successfully!"
+          );
+
         } else {
-          console.error("Profile update request failed.");
+
+          // Backend request failed
+          setEmailError(
+            "Failed to update profile. Please try again."
+          );
         }
+
       } catch (error) {
-        console.error("Critical: Failed to update profile.", error);
+
+        // Server or network failure
+        console.error(
+          "Critical: Failed to update profile.",
+          error
+        );
+
+        setEmailError(
+          "Server connection failed. Please try again."
+        );
+
       } finally {
+
+        // Stop loading state
         setIsSaving(false);
       }
     }
   };
+
   return (
-   <div className={`page-layout ${themeClass}`}>
-  <div className="page-content">
+
+    <div className={`page-layout ${themeClass}`}>
+
+      <div className="page-content">
+
+        {/* Page Header */}
         <CustomHeader
           isDarkMode={isDarkMode}
           title="Settings"
@@ -116,52 +187,87 @@ export function SettingsPage({ profile, setProfile }) {
         />
 
         <div className={`settings-card ${themeClass}`}>
+
+          {/* Profile Avatar */}
           <AvatarSection
             username={profile.username}
             isDarkMode={isDarkMode}
           />
 
           <div className="inputs-grid">
-            {/* Username Input with Validation Feedback */}
+
+            {/* Username Field */}
             <div>
+
               <SettingsInput
                 label="Username"
                 value={profile.username}
-                onChange={(e) => handleInputChange("username", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange(
+                    "username",
+                    e.target.value
+                  )
+                }
                 isDarkMode={isDarkMode}
               />
+
+              {/* Username Validation Error */}
               {userNameError !== "" && (
-                <p style={{ color: "#ff4d4d", fontSize: "12px", marginTop: "5px", display: "flex", alignItems: "center", gap: "4px" }}>
-                  <AlertCircle size={14} /> {userNameError}
+                <p className="error-message">
+                  <AlertCircle size={14} />
+                  {userNameError}
                 </p>
               )}
             </div>
 
-            {/* Email Input with Validation Feedback */}
+            {/* Email Field */}
             <div>
+
               <SettingsInput
                 label="Email"
                 type="email"
                 value={profile.email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange(
+                    "email",
+                    e.target.value
+                  )
+                }
                 isDarkMode={isDarkMode}
               />
+
+              {/* Email Validation Error */}
               {emailError !== "" && (
-                <p style={{ color: "#ff4d4d", fontSize: "12px", marginTop: "5px", display: "flex", alignItems: "center", gap: "4px" }}>
-                  <AlertCircle size={14} /> {emailError}
+                <p className="error-message">
+                  <AlertCircle size={14} />
+                  {emailError}
                 </p>
               )}
             </div>
           </div>
 
+          {/* Success Message */}
+          {successMessage !== "" && (
+            <p className="success-message">
+              <CheckCircle size={15} />
+              {successMessage}
+            </p>
+          )}
+
+          {/* Save Button */}
           <div className="save-actions-container">
+
             <button
               onClick={handleSaveProfile}
               disabled={isSaving}
               className="btn-full-save"
             >
               <Save size={20} />
-              <span>{isSaving ? "Saving..." : "Save Changes"}</span>
+
+              <span>
+                {isSaving ? "Saving..." : "Save Changes"}
+              </span>
+
             </button>
           </div>
         </div>

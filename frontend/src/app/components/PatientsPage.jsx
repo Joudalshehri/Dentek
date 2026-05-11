@@ -9,50 +9,62 @@ import "../../styles/PageLayout.css";
 
 /**
  * PatientsPage Component
- * 
- * Manages the core patient logic: fetching from API, searching, 
- * and handling the creation of new patient records with validation feedback.
+ *
+ * Fetches patients from the backend,
+ * displays them in the table,
+ * and sends new patient data to the backend.
+ *
+ * Validation is handled by the backend.
+ * The frontend only displays backend error messages.
  */
 export function PatientsPage({ onSelectPatient }) {
-  // --- State Management ---
+  // =========================
+  // State Management
+  // =========================
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
   const [patients, setPatients] = useState([]);
   const [errors, setErrors] = useState({});
 
-  // Form state for creating a new patient
+  // Form state for adding a new patient
   const [newPatient, setNewPatient] = useState({
     patient_id: "",
     name: "",
-    birthDate: "", // Keep as birthDate for frontend consistency
+    birthDate: "",
     phone: "",
     email: "",
   });
 
   const { isDarkMode } = useDarkMode();
 
-  /**
-   * Computed property: Filters the patient list based on search input.
-   * Matches against Name, Internal ID, or National ID.
-   */
-  const filteredPatients = patients.filter(
-    (patient) =>
-      patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.patient_id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // =========================
+  // Filtered Patients
+  // =========================
 
-  /**
-   * Fetches all patient records associated with the authenticated user.
-   */
+  const filteredPatients = patients.filter((patient) => {
+    const name = patient.name || "";
+    const id = patient.id || "";
+    const patientId = patient.patient_id || "";
+
+    return (
+    name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    id.includes(searchQuery) ||
+    patientId.includes(searchQuery));
+  });
+
+  // =========================
+  // Fetch Patients
+  // =========================
+
   const fetchPatients = async () => {
     try {
       const token = localStorage.getItem("token");
+
       if (!token) return;
 
       const response = await fetch("http://127.0.0.1:8000/api/patients/", {
         headers: {
-          // Corrected: Using backticks for template literals
           Authorization: `Token ${token}`,
         },
       });
@@ -64,7 +76,6 @@ export function PatientsPage({ onSelectPatient }) {
 
       const data = await response.json();
 
-      // Normalize backend data to match table field requirements
       const formatted = (data || []).map((p) => ({
         id: String(p.id ?? ""),
         patient_id: String(p.patient_id ?? ""),
@@ -80,59 +91,68 @@ export function PatientsPage({ onSelectPatient }) {
     }
   };
 
-  // Initial data load on component mount
   useEffect(() => {
     fetchPatients();
   }, []);
 
-  /**
-   * Handles submission of the new patient form.
-   * Sends data to the backend and maps field-specific errors if validation fails.
-   */
+  // =========================
+  // Add Patient
+  // =========================
+
   const handleAddPatient = async (e) => {
     e.preventDefault();
 
     try {
-      setErrors({}); // Reset error state
+      setErrors({});
+
       const token = localStorage.getItem("token");
 
-      const response = await fetch("http://127.0.0.1:8000/api/patients/create/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`, // Fixed template literal
-        },
-        body: JSON.stringify({
-          patient_id: newPatient.patient_id,
-          name: newPatient.name.trim(),
-          birth_date: newPatient.birthDate, // Map frontend 'birthDate' to backend 'birth_date'
-          phone: newPatient.phone,
-          email: newPatient.email.trim(),
-        }),
-      });
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/patients/create/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Token ${token}`,
+          },
+          body: JSON.stringify({
+            patient_id: newPatient.patient_id,
+            name: newPatient.name.trim(),
+            birth_date: newPatient.birthDate,
+            phone: newPatient.phone,
+            email: newPatient.email.trim(),
+          }),
+        }
+      );
 
       const responseData = await response.json().catch(() => null);
 
+      // If backend returns validation errors
       if (!response.ok) {
         if (responseData) {
-          // Flatten backend error arrays into single strings for the UI
           const backendErrors = {};
+
           Object.keys(responseData).forEach((key) => {
-            // Note: if backend sends 'birthDate', map it to frontend state name
-            const uiKey = key === 'birth_date' ? 'birthDate' : key;
+            const uiKey = key === "birth_date" ? "birthDate" : key;
+
             backendErrors[uiKey] = Array.isArray(responseData[key])
               ? responseData[key][0]
               : responseData[key];
           });
+
           setErrors(backendErrors);
         } else {
-          setErrors({ form: "An unexpected error occurred." });
+          setErrors({
+            form: "An unexpected error occurred.",
+          });
         }
+
         return;
       }
 
-      // Success: Refresh list, clear form, and close modal
+      // Success
       await fetchPatients();
+
       setNewPatient({
         patient_id: "",
         name: "",
@@ -140,21 +160,24 @@ export function PatientsPage({ onSelectPatient }) {
         phone: "",
         email: "",
       });
-      setIsAddPatientModalOpen(false);
 
+      setIsAddPatientModalOpen(false);
     } catch (error) {
       console.error("Submission error:", error);
-      setErrors({ form: "Server is unreachable. Please check your connection." });
+
+      setErrors({
+        form: "Server is unreachable. Please check your connection.",
+      });
     }
   };
 
+  // =========================
+  // UI Rendering
+  // =========================
+
   return (
-   <div
-  className={`page-layout ${
-    isDarkMode ? "dark" : "light"
-  }`}
->
-  <div className="page-content">
+    <div className={`page-layout ${isDarkMode ? "dark" : "light"}`}>
+      <div className="page-content">
         <CustomHeader
           isDarkMode={isDarkMode}
           onBtnClick={() => setIsAddPatientModalOpen(true)}

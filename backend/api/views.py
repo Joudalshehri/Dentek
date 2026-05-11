@@ -13,11 +13,13 @@ from django.contrib.auth import authenticate
 import os
 import re
 from datetime import date
+from django.db import IntegrityError, DatabaseError
 from django.utils.dateparse import parse_date
 
 import json
 from groq import Groq
 from dotenv import load_dotenv
+
 
 
 
@@ -30,71 +32,70 @@ client = Groq(api_key=GROQ_API_KEY)
 # Login Method
 @api_view(["POST"])
 def login_view(request):
-    """
-    Authenticates the user using either username or email.
-    Returns a token if the credentials are valid.
-    """
 
-    username_or_email = request.data.get("username", "").strip()
-    password = request.data.get("password", "")
+    try:
+        username_or_email = request.data.get("username", "").strip()
+        password = request.data.get("password", "")
 
-    # Validation: username/email is required
-    if not username_or_email:
-        return Response(
-            {
+        # Username/email required
+        if not username_or_email:
+            return Response({
                 "success": False,
                 "error": "Please enter your username or email",
-            },
-            status=status.HTTP_400_BAD_REQUEST
-        )
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Validation: password is required
-    if not password:
-        return Response(
-            {
+        # Password required
+        if not password:
+            return Response({
                 "success": False,
                 "error": "Please enter your password",
-            },
-            status=status.HTTP_400_BAD_REQUEST
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if input is email
+        user_obj = User.objects.filter(
+            email__iexact=username_or_email
+        ).first()
+
+        if user_obj:
+            username = user_obj.username
+        else:
+            username = username_or_email
+
+        # Authenticate user
+        user = authenticate(
+            request,
+            username=username,
+            password=password
         )
 
-    # If input is email, get the related username
-    user_obj = User.objects.filter(
-        email__iexact=username_or_email
-    ).first()
+        # Invalid credentials
+        if user is None:
+            return Response({
+                "success": False,
+                "error": "Incorrect username/email or password",
+            }, status=status.HTTP_401_UNAUTHORIZED)
 
-    if user_obj:
-        username = user_obj.username
-    else:
-        username = username_or_email
-        
-    # Django handles authentication automatically
-    user = authenticate(
-        request,
-        username=username,
-        password=password
-    )
-
-    # Login success
-    if user is not None:
+        # Generate token
         token, created = Token.objects.get_or_create(user=user)
 
+        # Success response
         return Response({
             "success": True,
+            "message": "Login successful",
             "token": token.key,
             "username": user.username,
             "email": user.email,
-        })
+        }, status=status.HTTP_200_OK)
 
-    # Invalid credentials
-    return Response(
-        {
+    # Server/database errors
+    except Exception as e:
+
+        print("Login Error:", str(e))
+
+        return Response({
             "success": False,
-            "error": "Incorrect username/email or password",
-        },
-        status=status.HTTP_401_UNAUTHORIZED
-    )
-
+            "error": "An unexpected error occurred. Please try again later.",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -688,6 +689,8 @@ def list_reports(request):
 
     return Response(data)
 
+
+
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def update_report(request, xray_id):
@@ -695,19 +698,73 @@ def update_report(request, xray_id):
     Update doctor notes for a specific report.
     """
 
-    # Validate xray_id
-    if not isinstance(xray_id, int) or xray_id <= 0:
-        return Response(
-            {"error": "Invalid XRay ID."},
-            status=400
-        )
-
-    # Get the X-ray and make sure it belongs to the logged-in user
     try:
+        # Validate xray_id
+        if not isinstance(xray_id, int) or xray_id <= 0:
+            return Response(
+                {"error": "Invalid XRay ID."},
+                status=400
+            )
+
+        # Get the X-ray and make sure it belongs to the logged-in user
         xray = XRay.objects.select_related("patient").get(
             id=xray_id,
             patient__doctors=request.user
         )
+
+        # Check if a report exists for this X-ray
+        if not hasattr(xray, "report"):
+            return Response(
+                {"error": "No report exists for this XRay to update."},
+                status=404
+            )
+
+        # Get doctor notes from request
+        doctor_notes = request.data.get("doctor_notes")
+
+        # Validate doctor_notes existence
+        if doctor_notes is None:
+            return Response(
+                {"error": "Doctor notes are required."},
+                status=400
+            )
+
+        # Validate doctor_notes type
+        if not isinstance(doctor_notes, str):
+            return Response(
+                {"error": "Doctor notes must be text."},
+                status=400
+            )
+
+        # Remove spaces from beginning and end
+        doctor_notes = doctor_notes.strip()
+
+        # Validate numeric-only notes
+        if doctor_notes.isdigit():
+            return Response(
+                {"error": "Doctor notes cannot contain only numbers."},
+                status=400
+            )
+
+        # Update report
+        report = xray.report
+        report.doctor_notes = doctor_notes
+        report.is_confirmed = True
+        report.save()
+
+        # Allow empty notes but show a warning message
+        if doctor_notes == "":
+            return Response({
+                "message": "Report saved without doctor notes.",
+                "doctor_notes": report.doctor_notes,
+                "warning": True
+            }, status=200)
+
+        # Success response
+        return Response({
+            "message": "Notes updated successfully.",
+            "doctor_notes": report.doctor_notes,
+        }, status=200)
 
     except XRay.DoesNotExist:
         return Response(
@@ -715,65 +772,12 @@ def update_report(request, xray_id):
             status=404
         )
 
-    # Check if a report exists for this X-ray
-    if not hasattr(xray, "report"):
+    except DatabaseError:
         return Response(
-            {"error": "No report exists for this XRay to update."},
-            status=404
+            {"error": "Failed to save report notes."},
+            status=500
         )
 
-    # Get doctor notes from request
-    doctor_notes = request.data.get("doctor_notes")
-
-    # Validate doctor_notes existence
-    if doctor_notes is None:
-        return Response(
-            {"error": "Doctor notes are required."},
-            status=400
-        )
-
-    # Validate doctor_notes type
-    if not isinstance(doctor_notes, str):
-        return Response(
-            {"error": "Doctor notes must be text."},
-            status=400
-        )
-
-    # Remove spaces from beginning and end
-    doctor_notes = doctor_notes.strip()
-
-   # Allow empty notes but show a warning message
-    if doctor_notes == "":
-    
-      report = xray.report
-      report.doctor_notes = ""
-      report.is_confirmed = True
-      report.save()
-
-      return Response({
-        "message": "Report saved without doctor notes.",
-        "doctor_notes": report.doctor_notes,
-        "warning": True
-     }, status=200)
-
-    # Validate numeric-only notes
-    elif doctor_notes.isdigit():
-        return Response(
-            {"error": "Doctor notes cannot contain only numbers."},
-            status=400
-        )
-
-    # Update report
-    report = xray.report
-    report.doctor_notes = doctor_notes
-    report.is_confirmed = True
-    report.save()
-
-    # Success response
-    return Response({
-        "message": "Notes updated successfully.",
-        "doctor_notes": report.doctor_notes,
-    }, status=200)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -843,9 +847,18 @@ def update_profile_view(request):
             "email": user.email,
         }, status=status.HTTP_200_OK)
         
-    except Exception as e:
-        # Handle unexpected database or server-side errors
+    except IntegrityError:
         return Response(
-            {"detail": "A server error occurred during update."}, 
+            {
+                "detail": "Username or email already exists."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    except DatabaseError:
+        return Response(
+            {
+                "detail": "A database error occurred during update."
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

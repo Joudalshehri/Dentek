@@ -50,128 +50,74 @@ export function SettingsPage({ profile, setProfile }) {
    * Validate profile data
    * and send update request
    */
-  const handleSaveProfile = async () => {
+const handleSaveProfile = async () => {
 
-    // Reset messages before validation
-    setUserNameError("");
-    setEmailError("");
-    setSuccessMessage("");
+  // Reset messages
+  setUserNameError("");
+  setEmailError("");
+  setSuccessMessage("");
 
-    let isValid = true;
+  // Start loading
+  setIsSaving(true);
 
-    /**
-     * Username validation
-     * Prevent empty usernames
-     */
-    if (profile.username.trim() === "") {
-      setUserNameError("Username is required");
-      isValid = false;
-    }
+  try {
 
-    /**
-     * Email validation
-     */
-    const emailValue = profile.email.trim();
+    // Send update request
+    const res = await fetch(
+      "http://127.0.0.1:8000/api/profile/update/",
+      {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(profile),
+      }
+    );
 
-    // Empty email validation
-    if (emailValue === "") {
-      setEmailError("Email address is required");
-      isValid = false;
-    }
+    const data = await res.json();
 
-    // Basic email structure validation
-    else if (
-      emailValue.includes("@") === false ||
-      emailValue.includes(".") === false
-    ) {
-      setEmailError(
-        "Please enter a complete email (e.g., example@domain.com)"
+    // Success
+    if (res.ok) {
+
+      setProfile({
+        username: data.username,
+        email: data.email,
+      });
+
+      setSuccessMessage(
+        data.message || "Profile updated successfully!"
       );
-      isValid = false;
-    }
 
-    // Ensure dot appears after @
-    else if (
-      emailValue.lastIndexOf(".") < emailValue.indexOf("@")
-    ) {
-      setEmailError("Invalid email structure");
-      isValid = false;
-    }
+    } else {
 
-    // Ensure domain extension exists
-    else if (
-      emailValue.split(".").pop().length < 2
-    ) {
-      setEmailError("Email domain is incomplete");
-      isValid = false;
-    }
+      // Display backend validation errors
+      if (data.username) {
+        setUserNameError(data.username);
+      }
 
-    /**
-     * Proceed only if validation succeeds
-     */
-    if (isValid === true) {
+      if (data.email) {
+        setEmailError(data.email);
+      }
 
-      // Activate loading state
-      setIsSaving(true);
-
-      try {
-
-        // Send update request to backend
-        const res = await fetch(
-          "http://127.0.0.1:8000/api/profile/update/",
-          {
-            method: "PUT",
-            headers: getAuthHeaders(),
-            body: JSON.stringify(profile),
-          }
-        );
-
-        /**
-         * Successful response
-         */
-        if (res.ok) {
-
-          const updated = await res.json();
-
-          // Update local profile state
-          setProfile({
-            username: updated.username,
-            email: updated.email,
-          });
-
-          // Show success message
-          setSuccessMessage(
-            "Profile updated successfully!"
-          );
-
-        } else {
-
-          // Backend request failed
-          setEmailError(
-            "Failed to update profile. Please try again."
-          );
-        }
-
-      } catch (error) {
-
-        // Server or network failure
-        console.error(
-          "Critical: Failed to update profile.",
-          error
-        );
-
-        setEmailError(
-          "Server connection failed. Please try again."
-        );
-
-      } finally {
-
-        // Stop loading state
-        setIsSaving(false);
+      if (data.detail) {
+        setEmailError(data.detail);
       }
     }
-  };
 
+  } catch (error) {
+
+    console.error(
+      "Critical: Failed to update profile.",
+      error
+    );
+
+    setEmailError(
+      "Server connection failed. Please try again."
+    );
+
+  } finally {
+
+    setIsSaving(false);
+  }
+};
   return (
 
     <div className={`page-layout ${themeClass}`}>

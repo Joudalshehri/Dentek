@@ -621,14 +621,31 @@ class DentekIntegrationTests(APITestCase):
         self.assertIn("Doctor notes are required", response.data["error"])
 
     def test_update_report_empty_doctor_notes(self):
-        patient_id, xray_id, analyze_response = self.create_analyzed_xray_for_doctor1()
+     patient_id, xray_id, analyze_response = self.create_analyzed_xray_for_doctor1()
 
-        response = self.client.put(f"/api/xrays/{xray_id}/update-report/", {
+     response = self.client.put(
+        f"/api/xrays/{xray_id}/update-report/",
+        {
             "doctor_notes": ""
-        })
+        }
+        )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Doctor notes cannot be empty", response.data["error"])
+     self.assertEqual(
+        response.status_code,
+        status.HTTP_200_OK
+       )
+
+     self.assertEqual(
+        response.data["message"],
+        "Report saved without doctor notes."
+       )
+
+     self.assertTrue(response.data["warning"])
+
+     self.assertEqual(
+        response.data["doctor_notes"],
+        ""
+       )
 
     def test_update_report_numbers_only_rejected(self):
         patient_id, xray_id, analyze_response = self.create_analyzed_xray_for_doctor1()

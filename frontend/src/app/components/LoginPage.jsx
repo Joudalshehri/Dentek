@@ -135,14 +135,13 @@ export function LoginPage({
       // Displays backend error message
       setServerError(
         data.error ||
-        "Invalid username or password. Please try again."
+        data.message ||
+        "Login failed. Please try again."
       );
 
     } catch (error) {
-
       console.error("Login error:", error);
 
-      // Displays server connection error
       setServerError(
         "Server connection failed. Please make sure Django is running."
       );
@@ -173,7 +172,7 @@ export function LoginPage({
 
       <main className="main-wrapper">
         <div className="login-card">
-        {/* Left side - Login form */}
+          {/* Left side - Login form */}
           <div className="form-side">
 
             <div className="form-header">

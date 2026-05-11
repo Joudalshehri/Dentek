@@ -1,27 +1,25 @@
 /* PatientsPage.css */
 
-/* Main layout container with full height and smooth theme transition */
-.patients-page-container {
-    min-height: 100vh;
-    padding: 2rem;
-    transition: background-color 0.3s ease;
+.patients-container {
+  /* تحديد الحد الأقصى للعرض ليكون المحتوى في المنتصف */
+  max-width: 1200px; 
+  /* auto من اليمين واليسار هي السر في التوسيط وإضافة المساحات الجانبية */
+  margin: 0 auto; 
+  display: flex;
+  flex-direction: column;
+  gap: 32px; /* زيادة المسافة الرأسية بين البحث والمربعات والجدول */
+  padding: 0 40px; /* إضافة مسافة أمان جانبية داخلية */
 }
 
-/* Light Mode Background */
-.patients-page-container.light {
-    background-color: #D5DDDF;
+/* تعديل بسيط للهيدر عشان يتماشى مع المساحات الجديدة */
+.patients-page h1, 
+.patients-page p {
+  padding-left: 0; /* تأكد أنها تتبع محاذاة الكانتينر الجديد */
 }
 
-/* Dark Mode Background */
-.patients-page-container.dark {
-    background-color: #1a1f2e;
-}
-
-/* Centered content wrapper with max-width and vertical spacing */
-.patients-content-wrapper {
-    max-width: 80rem; /* 7xl equivalent */
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem; /* Matches space-y-6 */
+@media (max-width: 768px) {
+  .patients-container {
+    padding: 0 20px; /* مساحة أصغر للجوال */
+    max-width: 100%;
+  }
 }

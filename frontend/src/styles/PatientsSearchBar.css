@@ -3,7 +3,7 @@
 /* Main layout wrapper for search and filter controls */
 .search-bar-container {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
     align-items: center;
 }
 

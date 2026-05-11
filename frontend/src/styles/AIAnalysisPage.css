@@ -1,6 +1,7 @@
 /* AIAnalysisPage.css */
 
-/* Page Layout */
+/* ================= Page Layout ================= */
+
 .analysis-container {
   min-height: 100vh;
   padding: 2rem;
@@ -18,20 +19,25 @@
 .analysis-content-wrapper {
   max-width: 64rem;
   margin: 0 auto;
+
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-/* Back Button */
+/* ================= Back Button ================= */
+
 .back-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+
   background: none;
   border: none;
+
   cursor: pointer;
   font-weight: 500;
+
   transition: color 0.2s;
 }
 
@@ -51,12 +57,16 @@
   color: #6fa86f;
 }
 
-/* Report Card */
+/* ================= Report Card ================= */
+
 .report-card {
   background-color: #ffffff;
+
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+
   border-radius: 1rem;
   padding: 2rem;
+
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -65,6 +75,7 @@
 .report-header {
   border-bottom: 1px solid #e5e7eb;
   padding-bottom: 1rem;
+
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -74,6 +85,7 @@
   font-size: 1.5rem;
   font-weight: 700;
   color: #3d5a54;
+
   margin-bottom: 0.25rem;
 }
 
@@ -82,7 +94,8 @@
   font-size: 0.875rem;
 }
 
-/* Patient Info */
+/* ================= Patient Info ================= */
+
 .patient-info-block {
   margin-top: 1rem;
 }
@@ -103,23 +116,33 @@
   color: #6b7280;
 }
 
-/* Section Titles */
+/* ================= Section Titles ================= */
+
 .image-section-title {
   font-size: 0.75rem;
   font-weight: 700;
+
   color: #374151;
+
   margin-bottom: 0.5rem;
+
+  text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-/* X-ray Image */
+/* ================= X-ray Image ================= */
+
 .xray-wrapper {
   position: relative;
   display: inline-block;
+
   background-color: #111827;
+
   border-radius: 0.75rem;
   overflow: hidden;
+
   border: 2px solid #f3f4f6;
+
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
 }
 
@@ -131,53 +154,60 @@
 
 .overlay-svg {
   position: absolute;
+
   top: 0;
   left: 0;
+
   width: 100%;
   height: 100%;
+
   pointer-events: none;
   z-index: 5;
 }
 
-/* Lesion Box */
+/* ================= Lesion Box ================= */
+
 .lesion-box {
   position: absolute;
+
   border: 2px solid #ef4444;
+
   box-sizing: border-box;
   border-radius: 6px;
+
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
 }
 
 .lesion-label {
   position: absolute;
+
   top: -22px;
   left: -50px;
+
   background-color: #ef4444;
   color: #ffffff;
+
   font-size: 12px;
+
   padding: 2px 6px;
   border-radius: 6px;
+
   white-space: nowrap;
 }
 
-/* Summary */
+/* ================= Summary ================= */
+
 .summary-section {
   margin-top: 24px;
 }
 
 .summary-card {
   background: #f9fafb;
+
   border-radius: 16px;
   padding: 30px;
-  border: 1px solid #e5e7eb;
-}
 
-.summary-title {
-  font-size: 16px;
-  color: #111827;
-  margin-bottom: 16px;
-  font-weight: 500;
-  line-height: 1.6;
+  border: 1px solid #e5e7eb;
 }
 
 .summary-grid {
@@ -188,29 +218,30 @@
 
 .summary-item {
   background: #ffffff;
+
   border-radius: 12px;
   padding: 16px;
+
   border: 1px solid #e5e7eb;
 }
 
 .item-label {
   font-size: 13px;
   color: #6b7280;
+
   margin-bottom: 8px;
 }
 
-.item-value {
-  font-size: 20px;
-  font-weight: 600;
-  color: #111827;
-}
+/* ================= Legend ================= */
 
-/* Legend */
 .legend {
   display: inline-flex;
   gap: 40px;
+
   align-items: center;
+
   margin: 10px 0 18px;
+
   white-space: nowrap;
   flex-wrap: wrap;
 }
@@ -219,16 +250,21 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+
   font-weight: 700;
   font-size: 15px;
+
   color: #2d2d2d;
+
   margin-right: 10px;
 }
 
 .dot {
   width: 12px;
   height: 12px;
+
   border-radius: 50%;
+
   display: inline-block;
 }
 
@@ -244,13 +280,18 @@
   background-color: #2ecc71;
 }
 
-/* Status Badges */
+/* ================= Status Badges ================= */
+
 .status-badge {
   display: inline-block;
+
   padding: 6px 14px;
+
   border-radius: 999px;
+
   font-size: 13px;
   font-weight: 600;
+
   border: 1px solid transparent;
 }
 
@@ -278,74 +319,55 @@
   border-color: #e5e7eb;
 }
 
-/* Recommendation */
+/* ================= Recommendation ================= */
+
 .recommendation-section {
   margin-top: 24px;
 }
 
 .recommendation-card {
   background: #ffffff;
+
   border: 1px solid #e5e7eb;
   border-radius: 16px;
+
   padding: 20px;
+
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.recommendation-line {
-  margin-bottom: 12px;
-  font-size: 16px;
-  line-height: 1.6;
-}
+/* ================= Doctor Notes ================= */
 
-.recommendation-steps {
-  margin-top: 12px;
-}
-
-.recommendation-steps ul {
-  margin-top: 8px;
-  padding-left: 20px;
-}
-
-.recommendation-steps li {
-  margin-bottom: 6px;
-}
-
-/* Doctor Notes */
 .doctor-notes-section {
   margin-top: 24px;
 }
 
 .notes-container {
   background: #ffffff;
+
   border: 1px solid #e5e7eb;
   border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
 
-.dark .notes-container {
-  background: #111827;
-  border-color: #374151;
+  padding: 20px;
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .doctor-notes-textarea {
   width: 100%;
   min-height: 140px;
+
   resize: vertical;
+
   border: 1px solid #d1d5db;
   border-radius: 12px;
+
   padding: 14px;
-  font-size: 14px;
-  line-height: 1.6;
+
   outline: none;
+
   background: #ffffff;
   color: #1f2937;
-}
-
-.dark .doctor-notes-textarea {
-  background: #1f2937;
-  color: #f9fafb;
-  border-color: #374151;
 }
 
 .doctor-notes-textarea:focus {
@@ -356,19 +378,27 @@
 .notes-actions {
   display: flex;
   justify-content: flex-end;
+
   margin-top: 12px;
 }
 
 .notes-save-btn {
   background-color: #3d5a54;
   color: #ffffff;
+
   border: none;
+
   padding: 10px 20px;
+
   border-radius: 9999px;
+
   font-size: 14px;
   font-weight: 600;
+
   cursor: pointer;
+
   transition: all 0.2s;
+
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
 }
 
@@ -383,19 +413,47 @@
   transform: none;
 }
 
-/* Download Button */
+/* ================= Notes Messages ================= */
+
+.notes-message {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.notes-message.success {
+  color: #16a34a;
+}
+
+.notes-message.error {
+  color: #dc2626;
+}
+
+.analysis-container.dark .notes-message.error {
+  color: #f87171;
+}
+
+/* ================= Download Button ================= */
+
 .download-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+
   padding: 0.75rem 1.5rem;
+
   border-radius: 9999px;
   border: none;
+
   color: #ffffff;
+
   font-size: 1.125rem;
   font-weight: 600;
+
   cursor: pointer;
+
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
   transition: all 0.3s;
 }
 
@@ -411,14 +469,17 @@
   transform: scale(1.02);
 }
 
-/* Loading */
+/* ================= Loading ================= */
+
 .loading-text {
   text-align: center;
   padding: 2rem;
 }
 
-/* Print */
+/* ================= Print ================= */
+
 @media print {
+
   .print-hidden {
     display: none !important;
   }
@@ -433,4 +494,91 @@
     border-radius: 0 !important;
     padding: 1rem !important;
   }
+
+}
+
+/* ================= Dark Mode ================= */
+
+.analysis-container.dark .report-card {
+  background-color: #1f2937;
+  color: #f9fafb;
+}
+
+.analysis-container.dark .report-header {
+  border-bottom-color: #374151;
+}
+
+.analysis-container.dark .brand-subtitle,
+.analysis-container.dark .patient-info-name span,
+.analysis-container.dark .patient-info-id {
+  color: #9ca3af;
+}
+
+.analysis-container.dark .patient-info-name,
+.analysis-container.dark .image-section-title {
+  color: #e5e7eb;
+}
+
+.analysis-container.dark .summary-card {
+  background: #111827;
+  border-color: #374151;
+}
+
+.analysis-container.dark .summary-item {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.analysis-container.dark .item-label {
+  color: #9ca3af;
+}
+
+.analysis-container.dark .legend-item {
+  color: #e5e7eb;
+}
+
+.analysis-container.dark .recommendation-card {
+  background: #111827;
+  border-color: #374151;
+}
+
+.analysis-container.dark .recommendation-summary,
+.analysis-container.dark .recommendation-text,
+.analysis-container.dark .recommendation-list,
+.analysis-container.dark .recommendation-label {
+  color: #e5e7eb;
+}
+
+.analysis-container.dark .notes-container {
+  background: #111827;
+  border-color: #374151;
+}
+
+.analysis-container.dark .doctor-notes-textarea {
+  background: #1f2937;
+  color: #f9fafb;
+  border-color: #374151;
+}
+
+.analysis-container.dark .doctor-notes-textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* ================= Shared Text Style ================= */
+
+.report-text {
+  font-size: 17px;
+  line-height: 1.8;
+  font-family: "Inter", sans-serif;
+  font-weight: 600;
+}
+
+/* ===== PDF Mode ===== */
+
+.pdf-mode .print-hidden {
+  display: none !important;
+}
+
+.pdf-mode .report-card {
+  box-shadow: none !important;
 }

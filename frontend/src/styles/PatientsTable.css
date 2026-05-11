@@ -1,162 +1,150 @@
-/* FONT */
-body {
-  font-family: "Inter", sans-serif;
-}
-
-/* CARD */
 .patients-table {
-  border-radius: 24px;
+  border-radius: 20px;
   overflow: hidden;
   background: #ffffff;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
+  font-family: "Inter", sans-serif;
 }
 
 .patients-table.dark {
   background: #1f2937;
+  border: 1px solid #374151;
 }
 
-/* TABLE */
-.table-wrapper {
+.patients-table .table-wrapper {
   overflow-x: auto;
 }
 
-table {
+.patients-table table {
   width: 100%;
   border-collapse: collapse;
 }
 
-/* HEADER */
-thead {
+/* ===== Header ===== */
+
+.patients-table thead {
   background: #f0f4f2;
 }
 
 .patients-table.dark thead {
-  background: #374151;
+  background: rgba(17,24,39,0.5);
 }
 
-th {
+.patients-table th {
   text-align: left;
-  padding: 16px 18px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #374151; /* أسود خفيف */
+  padding: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
 }
 
-/* ROW */
-.row {
-  cursor: pointer;
-  transition: all 0.2s ease;
+.patients-table.dark th {
+  color: #d1d5db;
 }
 
-.row:hover {
-  background: #f5f7f7;
-}
+/* ===== Cells ===== */
 
-.patients-table.dark .row:hover {
-  background: #374151;
-}
-
-/* CELLS */
-td {
-  padding: 18px 18px;
+.patients-table td {
+  padding: 16px;
   font-size: 14px;
-  color: #111827; /* أسود واضح */
+  color: #111827;
+  vertical-align: middle;
 }
 
 .patients-table.dark td {
   color: #e5e7eb;
 }
 
-/* ID */
-.id {
-  font-weight: 500;
-  color: #111827;
+/* ===== Rows ===== */
+
+.patients-table .row {
+  cursor: pointer;
+  transition: 0.2s;
 }
 
-/* NAME */
-.name-cell {
+.patients-table .row:hover {
+  background: #f9fafb;
+}
+
+.patients-table.dark .row:hover {
+  background: rgba(55,65,81,0.5);
+}
+
+/* ===== Name Section ===== */
+
+.patients-table .name-cell {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.name-cell span {
-  font-size: 14px;
-  font-weight: 500;
-  color: #111827;
-}
-
-/* AVATAR */
-.avatar {
-  width: 36px;
-  height: 36px;
+.patients-table .avatar {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3d5a54, #4a6860);
+  background: linear-gradient(#3d5a54, #4a6860);
   color: white;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+
+  font-size: 12px;
   font-weight: 600;
 }
 
-/* CONTACT */
-.contact {
+/* ===== Contact ===== */
+
+.patients-table .contact {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: #111827;
+  gap: 4px;
+  font-size: 14px;
 }
 
-.contact div {
+.patients-table .contact div {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-/* ICON */
-.icon {
+/* ===== Icons ===== */
+
+.patients-table .icon {
   width: 14px;
   height: 14px;
-  opacity: 0.8; /* أوضح */
+  opacity: 0.8;
 }
 
-/* ARROW */
-.arrow {
+/* ===== Arrow ===== */
+
+.patients-table .arrow {
   text-align: right;
 }
 
-.arrow-icon {
+.patients-table .arrow-icon {
   width: 18px;
   height: 18px;
   opacity: 0.6;
-  transition: all 0.2s ease;
+  transition: 0.2s;
 }
 
-.row:hover .arrow-icon {
+.patients-table .row:hover .arrow-icon {
   opacity: 1;
   transform: translateX(3px);
 }
 
-/* EMPTY STATE */
-.empty {
+/* ===== Empty State ===== */
+
+.patients-table .empty {
   text-align: center;
   padding: 40px;
   font-size: 14px;
   color: #6b7280;
+  background: #ffffff;
 }
 
-/* DARK MODE تحسين */
-.patients-table.dark th {
-  color: #d1d5db;
-}
-
-.patients-table.dark .contact {
-  color: #e5e7eb;
-}
-
-.patients-table.dark .id,
-.patients-table.dark .name-cell span {
-  color: #f9fafb;
+.patients-table.dark .empty {
+  background: #1f2937;
+  color: #9ca3af;
 }

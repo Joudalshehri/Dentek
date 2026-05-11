@@ -126,8 +126,8 @@ export function ReportsPage({ onViewReport }) {
   }, [reports, searchQuery]);
 
   return (
-    <div className={`page ${isDarkMode ? "dark" : "light"}`}>
-      <div className="container">
+  <div className={`page-layout ${isDarkMode ? "dark" : "light"}`}>
+    <div className="page-content">
         {/* Visual Header with Branding/Context */}
         <CustomHeader
           isDarkMode={isDarkMode}

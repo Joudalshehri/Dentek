@@ -1,0 +1,29 @@
+.page-layout {
+  min-height: 100vh;
+  padding: 0.5rem;
+  transition: background-color 0.3s ease;
+}
+
+.page-layout.light {
+  background-color: #D5DDDF;
+}
+
+.page-layout.dark {
+  background-color: #1a1f2e;
+}
+
+.page-content {
+  max-width: 60rem;
+  margin: 0 auto;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section-spacing {
+  margin-left: 1rem;
+  margin-right: 2rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}

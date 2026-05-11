@@ -106,8 +106,8 @@ export function SettingsPage({ profile, setProfile }) {
     }
   };
   return (
-    <div className={`settings-container ${themeClass}`}>
-      <div className="settings-max-width">
+   <div className={`page-layout ${themeClass}`}>
+  <div className="page-content">
         <CustomHeader
           isDarkMode={isDarkMode}
           title="Settings"

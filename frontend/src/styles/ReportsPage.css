@@ -1,29 +1,7 @@
-/* ================= CSS ================= */
-
-/* ReportsPage.css */
-
-.page {
-  min-height: 100vh;
-  padding: 24px;
-}
-
-.page.light {
-  background: #d5dddf;
-}
-
-.page.dark {
-  background: #1a1f2e;
-}
-
-.container {
-  max-width: 1280px;
-  margin: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+/* ================= ReportsPage.css ================= */
 
 /* ===== Stats ===== */
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -37,7 +15,7 @@
   border: 1px solid #eee;
 }
 
-.page.dark .stat-card {
+.page-layout.dark .stat-card {
   background: #1f2937;
   border: 1px solid #374151;
 }
@@ -45,28 +23,39 @@
 .stat-number {
   font-size: 24px;
   font-weight: bold;
+  color: #111827;
 }
 
-.stat-number.green { color: #16a34a; }
-.stat-number.red { color: #dc2626; }
+.page-layout.dark .stat-number {
+  color: #ffffff;
+}
+
+.stat-number.green {
+  color: #16a34a;
+}
+
+.stat-number.red {
+  color: #dc2626;
+}
 
 .stat-label {
   font-size: 12px;
   color: #666;
 }
 
-.page.dark .stat-label {
+.page-layout.dark .stat-label {
   color: #9ca3af;
 }
 
 /* ===== Table ===== */
+
 .table-card {
   background: white;
   border-radius: 20px;
   overflow: hidden;
 }
 
-.page.dark .table-card {
+.page-layout.dark .table-card {
   background: #1f2937;
 }
 
@@ -82,13 +71,15 @@
   color: #374151;
 }
 
-.page.dark .table th {
+.page-layout.dark .table th {
   background: rgba(17,24,39,0.5);
   color: #d1d5db;
 }
-.page.dark .table td {
+
+.page-layout.dark .table td {
   color: #e5e7eb;
 }
+
 .table th,
 .table td {
   padding: 16px;
@@ -104,7 +95,7 @@
   background: #f9fafb;
 }
 
-.page.dark .patient-row:hover {
+.page-layout.dark .patient-row:hover {
   background: rgba(55,65,81,0.5);
 }
 
@@ -119,10 +110,13 @@
   height: 32px;
   border-radius: 50%;
   background: linear-gradient(#3d5a54, #4a6860);
+
   color: white;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   font-size: 12px;
   font-weight: 600;
 }
@@ -136,19 +130,22 @@
 }
 
 /* ===== Expanded Section ===== */
+
 .expanded {
   background: #f9fafb;
 }
 
-.page.dark .expanded {
+.page-layout.dark .expanded {
   background: rgba(17,24,39,0.2);
 }
 
 .reports-list {
   padding: 16px 48px;
+
   display: flex;
   flex-direction: column;
   gap: 12px;
+
   border-left: 4px solid #3d5a54;
   margin-left: 20px;
 }
@@ -157,13 +154,16 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   padding: 14px 16px;
+
   border-radius: 14px;
   border: 1px solid #e5e7eb;
+
   background: white;
 }
 
-.page.dark .report-item {
+.page-layout.dark .report-item {
   background: #111827;
   border: 1px solid #374151;
 }
@@ -182,33 +182,44 @@
   display: flex;
   align-items: center;
   gap: 6px;
+
   color: #6b7280;
 }
 
-.page.dark .report-date {
+.page-layout.dark .report-date {
   color: #9ca3af;
 }
 
-.findings.red { color: #dc2626; }
-.findings.green { color: #16a34a; }
+.findings.red {
+  color: #dc2626;
+}
 
-/* ===== Actions Fix (THIS IS YOUR ISSUE) ===== */
+.findings.green {
+  color: #16a34a;
+}
+
+/* ===== Actions ===== */
+
 .actions {
   display: flex;
   align-items: center;
-  gap: 12px; /* المسافة بين زر العين والتحميل */
+  gap: 12px;
 }
 
 .actions button {
   display: flex;
   align-items: center;
   justify-content: center;
+
   width: 32px;
   height: 32px;
+
   border-radius: 50%;
   border: none;
+
   background: transparent;
   cursor: pointer;
+
   transition: 0.2s;
 }
 
@@ -220,7 +231,7 @@
   color: #6b7280;
 }
 
-.page.dark .actions svg {
+.page-layout.dark .actions svg {
   color: #9ca3af;
 }
 
@@ -229,6 +240,7 @@
 }
 
 /* ===== Loading ===== */
+
 .loading {
   text-align: center;
   padding: 40px;

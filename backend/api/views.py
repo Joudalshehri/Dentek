@@ -96,6 +96,7 @@ def login_view(request):
         },
         status=status.HTTP_401_UNAUTHORIZED
     )
+
     
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -104,76 +105,111 @@ def create_patient(request):
     Creates a new patient record.
     Performs manual validation and returns field-specific error messages.
     """
+
     data = request.data
     errors = {}
 
     # Extract and clean data
-    patient_code = data.get("patient_id", "").strip()
-    full_name = data.get("name", "").strip()
+    patient_code = (
+        data.get("patient_id")
+        or data.get("national_id")
+        or ""
+    ).strip()
+
+    full_name = (
+        data.get("name")
+        or data.get("full_name")
+        or ""
+    ).strip()
+
     birth_date = data.get("birth_date") or data.get("birthDate")
-    phone = data.get("phone", "").strip()
+
+    phone = (
+        data.get("phone")
+        or data.get("phone_number")
+        or ""
+    ).strip()
+
     email = data.get("email", "").strip()
 
-    # 1. National ID (patient_id) Validation
+    # 1. National ID Validation
     if not patient_code:
         errors["patient_id"] = "National ID is required."
+
     elif not re.match(r"^\d{10}$", patient_code):
         errors["patient_id"] = "National ID must be exactly 10 digits."
 
-    elif Patient.objects.filter(national_id=patient_code, doctors=request.user).exists():
+    elif Patient.objects.filter(
+        national_id=patient_code,
+        doctors=request.user
+    ).exists():
         errors["patient_id"] = "This patient is already in your list."
 
     # 2. Name Validation
     if not full_name:
         errors["name"] = "Full name is required."
+
     elif not re.match(r"^[A-Za-z\u0600-\u06FF\s]+$", full_name):
         errors["name"] = "Name must contain letters only."
 
     # 3. Birth Date Validation
     if not birth_date:
         errors["birthDate"] = "Date of birth is required."
+
     else:
         parsed_birth_date = parse_date(birth_date)
+
         if not parsed_birth_date:
             errors["birthDate"] = "Invalid date format."
+
         elif parsed_birth_date > date.today():
             errors["birthDate"] = "Birth date cannot be in the future."
 
     # 4. Phone Validation
     if not phone:
         errors["phone"] = "Phone number is required."
+
     elif not re.match(r"^05\d{8}$", phone):
         errors["phone"] = "Phone must start with 05 and contain 10 digits."
 
     # 5. Email Validation
     if not email:
         errors["email"] = "Email address is required."
+
     else:
         email_pattern = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
+
         if not re.match(email_pattern, email):
             errors["email"] = "Please enter a valid email address."
 
-    # Return 400 Bad Request if any validation failed
+    # Return validation errors
     if errors:
-        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     try:
-
         patient, created = Patient.objects.get_or_create(
             national_id=patient_code,
             defaults={
-                'full_name': full_name,
-                'phone_number': phone,
-                'email': email,
-                'birth_date': birth_date
+                "full_name": full_name,
+                "phone_number": phone,
+                "email": email,
+                "birth_date": birth_date,
             }
         )
 
-        DoctorPatient.objects.get_or_create(doctor=request.user, patient=patient)
+        DoctorPatient.objects.get_or_create(
+            doctor=request.user,
+            patient=patient
+        )
 
         return Response(
             {
                 "id": patient.id,
+                "national_id": patient.national_id,
+                "full_name": patient.full_name,
                 "patient_id": patient.national_id,
                 "name": patient.full_name,
                 "message": "Patient registered successfully",
@@ -182,11 +218,12 @@ def create_patient(request):
         )
 
     except Exception as e:
-        # Unexpected server-side failures
         return Response(
             {"form": f"Internal server error: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_patient(request, patient_id):

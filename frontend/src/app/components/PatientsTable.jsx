@@ -19,7 +19,11 @@ import "../../styles/PatientsTable.css";
  * - Clickable patient rows
  */
 
-export function PatientsTable({ isDarkMode, patients, onSelectPatient }) {
+export function PatientsTable({
+  isDarkMode,
+  patients,
+  onSelectPatient,
+}) {
 
   // Apply dark mode class
   const theme = isDarkMode ? "dark" : "";

@@ -5,6 +5,7 @@ import { PatientsSearchBar } from "./PatientsSearchBar";
 import { PatientsStats } from "./PatientsStats";
 import { PatientsTable } from "./PatientsTable";
 import { AddPatientModal } from "./AddPatientModal";
+import "../../styles/PageLayout.css";
 
 /**
  * PatientsPage Component
@@ -148,12 +149,12 @@ export function PatientsPage({ onSelectPatient }) {
   };
 
   return (
-    <div
-      className={`min-h-screen p-8 transition-colors duration-300 ${
-        isDarkMode ? "bg-[#1a1f2e]" : "bg-[#D5DDDF]"
-      }`}
-    >
-      <div className="max-w-7xl mx-auto space-y-6">
+   <div
+  className={`page-layout ${
+    isDarkMode ? "dark" : "light"
+  }`}
+>
+  <div className="page-content">
         <CustomHeader
           isDarkMode={isDarkMode}
           onBtnClick={() => setIsAddPatientModalOpen(true)}

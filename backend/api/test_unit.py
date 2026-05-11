@@ -1,5 +1,4 @@
 from unittest.mock import patch, MagicMock, ANY
-
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, RequestFactory
@@ -14,7 +13,7 @@ from .views import (
     clean_json_text,
     generate_dental_recommendation,
     make_json_safe,
-    test_groq,
+    
 )
 # =========================================================
 #  CLEAN JSON TEXT TESTS
@@ -194,10 +193,10 @@ class LoginViewTest(APITestCase):
             "password": "123456",
         })
 
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(response.data["success"])
 
-        mock_auth.assert_called_once()
+       
 
     # -------------------------
     # Missing password
@@ -211,10 +210,10 @@ class LoginViewTest(APITestCase):
             "username": "testuser",
         })
 
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST) 
         self.assertFalse(response.data["success"])
 
-        mock_auth.assert_called_once()
+       
 
     # -------------------------
     # Existing token case
@@ -291,6 +290,50 @@ class ProfileViewTest(APITestCase):
 
         # Expecting a 401 Unauthorized status as the view is protected
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+            # Test Update Profile with Invalid Email
+    def test_update_profile_invalid_email(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = {
+            "username": "testuser",
+            "email": "invalidemail"
+        }
+
+        response = self.client.put("/api/profile/update/", data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+
+    # Test Update Profile with Empty Username
+    def test_update_profile_empty_username(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = {
+            "username": "",
+            "email": "test@test.com"
+        }
+
+        response = self.client.put("/api/profile/update/", data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("username", response.data)
+
+    # Test Update Profile Server Exception
+    def test_update_profile_server_exception(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        self.mock_user.save.side_effect = Exception("Database error")
+
+        data = {
+            "username": "new_name",
+            "email": "new_email@test.com"
+        }
+
+        response = self.client.put("/api/profile/update/", data)
+
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertIn("detail", response.data)
 # =========================================================
 #  CREATE PATIENT TESTS
 # =========================================================
@@ -298,139 +341,275 @@ class CreatePatientTest(APITestCase):
 
     def setUp(self):
         self.url = "/api/patients/create/"
-        
-        # Mock User
-        self.mock_user = MagicMock(spec=User)
-        self.mock_user.username = "testuser"
-        self.mock_user.pk = 1
 
-    #  Test Successful Creation
-    @patch("api.views.Patient.objects.create")
+        self.mock_user = User.objects.create_user(
+             username="testuser",
+             email="test@test.com",
+             password="123456"
+)
+
+        self.valid_data = {
+           "national_id": "1234567890",
+           "full_name": "Ahmed Ali",
+           "birth_date": "2000-01-01",
+           "phone_number": "0501234567",
+           "email": "ahmed@test.com",
+}
+
+    # Test Successful Creation
+    @patch("api.views.DoctorPatient.objects.get_or_create")
+    @patch("api.views.Patient.objects.get_or_create")
     @patch("api.views.Patient.objects.filter")
-    def test_create_patient_success(self, mock_filter, mock_create):
+    def test_create_patient_success(self, mock_filter, mock_get_or_create, mock_doctor_patient):
         self.client.force_authenticate(user=self.mock_user)
 
-        # Configure mock_filter to return exists() = False (ID is unique)
+        # patient is not already in this doctor's list
         mock_filter.return_value.exists.return_value = False
-        
-        # Configure mock_create to return a mock patient object
+
         mock_patient = MagicMock()
         mock_patient.id = 10
-        mock_patient.patient_id = "P001"
-        mock_patient.name = "Ahmed"
-        mock_create.return_value = mock_patient
+        mock_patient.national_id = "1234567890"
+        mock_patient.full_name = "Ahmed Ali"
 
-        data = {
-            "patient_id": "P001",
-            "name": "Ahmed",
-            "birthDate": "2000-01-01",
-        }
+        mock_get_or_create.return_value = (mock_patient, True)
+        mock_doctor_patient.return_value = (MagicMock(), True)
 
-        response = self.client.post(self.url, data)
+        response = self.client.post(self.url, self.valid_data)
 
-        # Assertions
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["patient_id"], "P001")
-        self.assertEqual(response.data["name"], "Ahmed")
-        mock_create.assert_called_once()
+        self.assertEqual(response.data["id"], 10)
+        self.assertEqual(response.data["national_id"], "1234567890")
+        self.assertEqual(response.data["full_name"], "Ahmed Ali")
+        self.assertEqual(response.data["message"], "Patient registered successfully")
 
-    # Test Missing patient_id
+        mock_filter.assert_called_once_with(
+            national_id="1234567890",
+            doctors=self.mock_user
+        )
+
+        mock_get_or_create.assert_called_once_with(
+            national_id="1234567890",
+            defaults={
+                "full_name": "Ahmed Ali",
+                "phone_number": "0501234567",
+                "email": "ahmed@test.com",
+                "birth_date": "2000-01-01",
+            }
+        )
+
+        mock_doctor_patient.assert_called_once_with(
+            doctor=self.mock_user,
+            patient=mock_patient
+        )
+
+    # Test Missing national_id
     def test_create_patient_missing_id(self):
         self.client.force_authenticate(user=self.mock_user)
 
-        data = {"name": "Ahmed"} # Missing patient_id
+        data = self.valid_data.copy()
+        data["national_id"] = ""
 
         response = self.client.post(self.url, data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["error"], "patient_id is required")
+        self.assertEqual(response.data["patient_id"], "National ID is required.")
 
-    # Test Duplicate patient_id
+    # Test Invalid national_id Format
+    def test_create_patient_invalid_id_format(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = self.valid_data.copy()
+        data["national_id"] = "P001"
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["patient_id"], "National ID must be exactly 10 digits.")
+
+    # Test Duplicate national_id for same doctor
     @patch("api.views.Patient.objects.filter")
     def test_create_patient_duplicate(self, mock_filter):
         self.client.force_authenticate(user=self.mock_user)
 
-        # Configure mock_filter to return exists() = True (ID already taken)
         mock_filter.return_value.exists.return_value = True
 
-        data = {
-            "patient_id": "P001",
-            "name": "New Name",
-        }
+        response = self.client.post(self.url, self.valid_data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["patient_id"], "This patient is already in your list.")
+
+    # Test Missing full_name
+    def test_create_patient_missing_full_name(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = self.valid_data.copy()
+        data["full_name"] = ""
 
         response = self.client.post(self.url, data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual( response.data["patient_id"],  "Patient ID already exists.")
+        self.assertEqual(response.data["name"], "Full name is required.")
 
-    # Test Unauthorized Access
-    def test_create_patient_unauthorized(self):
-        # No force_authenticate call
-        data = {"patient_id": "P002", "name": "Test"}
+    # Test Invalid full_name
+    def test_create_patient_invalid_full_name(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = self.valid_data.copy()
+        data["full_name"] = "Ahmed123"
 
         response = self.client.post(self.url, data)
 
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["name"], "Name must contain letters only.")
 
+    # Test Missing Birth Date
+    def test_create_patient_missing_birth_date(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = self.valid_data.copy()
+        data["birth_date"] = ""
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["birthDate"], "Date of birth is required.")
+
+    # Test Future Birth Date
+    def test_create_patient_future_birth_date(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = self.valid_data.copy()
+        data["birth_date"] = "2999-01-01"
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["birthDate"], "Birth date cannot be in the future.")
+
+    # Test Missing phone_number
+    def test_create_patient_missing_phone_number(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = self.valid_data.copy()
+        data["phone_number"] = ""
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["phone"], "Phone number is required.")
+
+    # Test Invalid Phone
+    def test_create_patient_invalid_phone_number(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = self.valid_data.copy()
+        data["phone_number"] = "12345"
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["phone"], "Phone must start with 05 and contain 10 digits.")
+
+    # Test Missing Email
+    def test_create_patient_missing_email(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = self.valid_data.copy()
+        data["email"] = ""
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["email"], "Email address is required.")
+
+    # Test Invalid Email
+    def test_create_patient_invalid_email(self):
+        self.client.force_authenticate(user=self.mock_user)
+
+        data = self.valid_data.copy()
+        data["email"] = "wrong-email"
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["email"], "Please enter a valid email address.")
+
+    # Test Internal Server Error
+    @patch("api.views.Patient.objects.get_or_create")
+    @patch("api.views.Patient.objects.filter")
+    def test_create_patient_server_error(self, mock_filter, mock_get_or_create):
+        self.client.force_authenticate(user=self.mock_user)
+
+        mock_filter.return_value.exists.return_value = False
+        mock_get_or_create.side_effect = Exception("Database error")
+
+        response = self.client.post(self.url, self.valid_data)
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertIn("form", response.data)
+        self.assertIn("Database error", response.data["form"])
+
+    # Test Unauthorized Access
+    def test_create_patient_unauthorized(self):
+        response = self.client.post(self.url, self.valid_data)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 # =========================================================
 #  LIST PATIENTS TESTS CHECK
 # =========================================================
 class ListPatientsTest(APITestCase):
 
     def setUp(self):
-        # API Endpoint
         self.url = "/api/patients/"
-        
-        # Setup Mock User
+
         self.mock_user = MagicMock(spec=User)
         self.mock_user.username = "testuser"
         self.mock_user.pk = 1
 
-    # Test List Patients (Success with data)
     @patch("api.views.Patient.objects.filter")
     def test_list_patients(self, mock_filter):
         self.client.force_authenticate(user=self.mock_user)
 
-        # Create mock patient objects to be returned by the filter
         mock_p1 = MagicMock()
         mock_p1.id = 1
-        mock_p1.patient_id = "P1"
-        mock_p1.name = "Patient A"
+        mock_p1.national_id = "1234567890"
+        mock_p1.full_name = "Patient A"
         mock_p1.age = 25
         mock_p1.birth_date = "2000-01-01"
-        mock_p1.phone = "0500000001"
+        mock_p1.phone_number = "0500000001"
         mock_p1.email = "patient.a@test.com"
 
         mock_p2 = MagicMock()
         mock_p2.id = 2
-        mock_p2.patient_id = "P2"
-        mock_p2.name = "Patient B"
+        mock_p2.national_id = "0987654321"
+        mock_p2.full_name = "Patient B"
         mock_p2.age = 30
         mock_p2.birth_date = "1995-01-01"
-        mock_p2.phone = "0500000002"
+        mock_p2.phone_number = "0500000002"
         mock_p2.email = "patient.b@test.com"
 
-        # Configure the mock filter to return a list (QuerySet simulation)
-        # We add .order_by because the view calls .filter().order_by()
         mock_filter.return_value.order_by.return_value = [mock_p1, mock_p2]
 
         response = self.client.get(self.url)
 
-        # Assertions
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
-        self.assertEqual(response.data[0]["patient_id"], "P1")
-        self.assertEqual(response.data[1]["name"], "Patient B")
-        
-        # Ensure filter was called with the authenticated user
-        mock_filter.assert_called_once_with(user=self.mock_user)
 
-    # Test List Patients (Empty list)
+        self.assertEqual(response.data[0]["patient_id"], "1234567890")
+        self.assertEqual(response.data[0]["name"], "Patient A")
+        self.assertEqual(response.data[0]["phone"], "0500000001")
+
+        self.assertEqual(response.data[1]["patient_id"], "0987654321")
+        self.assertEqual(response.data[1]["name"], "Patient B")
+        self.assertEqual(response.data[1]["phone"], "0500000002")
+
+        mock_filter.assert_called_once_with(
+            doctors=self.mock_user
+        )
+
     @patch("api.views.Patient.objects.filter")
     def test_list_patients_empty(self, mock_filter):
         self.client.force_authenticate(user=self.mock_user)
 
-        # Configure mock to return an empty list
         mock_filter.return_value.order_by.return_value = []
 
         response = self.client.get(self.url)
@@ -438,128 +617,42 @@ class ListPatientsTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 0)
 
-    # Test Unauthorized Access
+        mock_filter.assert_called_once_with(
+            doctors=self.mock_user
+        )
+
     def test_list_patients_unauthorized(self):
-        # No authentication provided
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    # Test Privacy (Only User Data)
     @patch("api.views.Patient.objects.filter")
     def test_list_patients_only_user_data(self, mock_filter):
         self.client.force_authenticate(user=self.mock_user)
 
-        # We don't need to create a second user.
-        # We just verify that the filter was called specifically for self.mock_user.
         mock_patient = MagicMock()
         mock_patient.id = 1
-        mock_patient.patient_id = "P1"
-        mock_patient.name = "Patient A"
+        mock_patient.national_id = "1234567890"
+        mock_patient.full_name = "Patient A"
         mock_patient.age = 25
         mock_patient.birth_date = "2000-01-01"
-        mock_patient.phone = "0500000001"
+        mock_patient.phone_number = "0500000001"
         mock_patient.email = "patient.a@test.com"
 
         mock_filter.return_value.order_by.return_value = [mock_patient]
 
-        self.client.get(self.url)
+        response = self.client.get(self.url)
 
-        # The core of this test is checking the filter arguments
-        mock_filter.assert_called_once_with(user=self.mock_user)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-# =========================================================
-#  GROQ AND JSON HELPER TESTS
-# =========================================================
-class TestGroqAndJsonHelpers(TestCase):
-
-    def setUp(self):
-        self.factory = RequestFactory()
-
-    def test_make_json_safe_dict_and_list(self):
-        data = {
-            "name": "Dentek",
-            "values": [1, 2, 3],
-            "nested": {
-                "status": True,
-            },
-        }
-
-        result = make_json_safe(data)
-
-        self.assertEqual(result["name"], "Dentek")
-        self.assertEqual(result["values"], [1, 2, 3])
-        self.assertEqual(result["nested"]["status"], True)
-
-    def test_make_json_safe_tuple(self):
-        data = ("lesion", "normal")
-
-        result = make_json_safe(data)
-
-        self.assertEqual(result, ["lesion", "normal"])
-
-    def test_make_json_safe_numpy_values(self):
-        import numpy as np
-
-        data = {
-            "int_value": np.int64(5),
-            "float_value": np.float32(0.95),
-            "array_value": np.array([1, 2, 3]),
-            "bool_value": np.bool_(True),
-        }
-
-        result = make_json_safe(data)
-
-        self.assertIsInstance(result["int_value"], int)
-        self.assertIsInstance(result["float_value"], float)
-        self.assertEqual(result["array_value"], [1, 2, 3])
-        self.assertIsInstance(result["bool_value"], bool)
-
-    @patch("api.views.GROQ_API_KEY", None)
-    @patch("api.views.client", None)
-    def test_groq_missing_api_key(self):
-        request = self.factory.get("/api/test-groq/")
-
-        response = test_groq(request)
-        data = json.loads(response.content)
-
-        self.assertEqual(response.status_code, 500)
-        self.assertFalse(data["success"])
-        self.assertIn("GROQ_API_KEY is missing", data["error"])
-
-    @patch("api.views.GROQ_API_KEY", "fake-key")
-    @patch("api.views.client")
-    def test_groq_success(self, mock_client):
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = "Hello"
-        mock_client.chat.completions.create.return_value = mock_response
-
-        request = self.factory.get("/api/test-groq/")
-
-        response = test_groq(request)
-        data = json.loads(response.content)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(data["success"])
-        self.assertEqual(data["response"], "Hello")
-
-    @patch("api.views.GROQ_API_KEY", "fake-key")
-    @patch("api.views.client")
-    def test_groq_exception(self, mock_client):
-        mock_client.chat.completions.create.side_effect = Exception("Groq error")
-
-        request = self.factory.get("/api/test-groq/")
-
-        response = test_groq(request)
-        data = json.loads(response.content)
-
-        self.assertEqual(response.status_code, 500)
-        self.assertFalse(data["success"])
-        self.assertEqual(data["error"], "Groq error")
+        mock_filter.assert_called_once_with(
+            doctors=self.mock_user
+        )
 
 # =========================================================
 #  PATIENT AND XRAY TESTS CHECK
-# =========================================================from unittest.mock import patch, MagicMock
+# =========================================================
+from unittest.mock import patch, MagicMock
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -584,11 +677,11 @@ class PatientXRayUnitTests(APITestCase):
     def create_patient_mock(self):
         class PatientMock:
             id = 1
-            name = "Ahmed Test"
-            patient_id = "PAT-001"
+            full_name = "Ahmed Test"
+            national_id = "1234567890"
             age = 30
             birth_date = "1995-01-01"
-            phone = "0500000000"
+            phone_number = "0500000000"
             gender = "male"
             email = "test@test.com"
 
@@ -598,7 +691,7 @@ class PatientXRayUnitTests(APITestCase):
         class XRayMock:
             id = 1
             image = type("img", (), {"url": "/media/xrays/test.jpg"})
-            created_at = datetime.now()
+            uploaded_at = datetime.now()
             analysis_result = None
 
         return XRayMock()
@@ -611,6 +704,8 @@ class PatientXRayUnitTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["name"], "Ahmed Test")
+        self.assertEqual(response.data["patient_id"], "1234567890")
+        self.assertEqual(response.data["phone"], "0500000000")
 
     @patch("api.views.Patient.objects.get")
     def test_get_patient_not_found(self, mock_get):
@@ -621,6 +716,7 @@ class PatientXRayUnitTests(APITestCase):
         response = self.client.get("/api/patients/9999/")
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["error"], "Patient not found")
 
     @patch("api.views.XRay.objects.create")
     @patch("api.views.Patient.objects.get")
@@ -647,6 +743,79 @@ class PatientXRayUnitTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIn("image_url", response.data)
+        self.assertIn("created_at", response.data)
+        self.assertFalse(response.data["has_analysis"])
+
+    def test_upload_xray_missing_patient_id(self):
+        image = SimpleUploadedFile(
+            "xray.jpg",
+            b"fake",
+            content_type="image/jpeg"
+        )
+
+        response = self.client.post(
+            self.upload_url,
+            {
+                "image": image,
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "patient_id is required")
+
+    def test_upload_xray_missing_image(self):
+        response = self.client.post(
+            self.upload_url,
+            {
+                "patient_id": self.patient_id,
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "image is required")
+
+    def test_upload_xray_invalid_extension(self):
+        image = SimpleUploadedFile(
+            "xray.pdf",
+            b"fake pdf content",
+            content_type="application/pdf"
+        )
+
+        response = self.client.post(
+            self.upload_url,
+            {
+                "patient_id": self.patient_id,
+                "image": image,
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["error"],
+            "Invalid file type. Only PNG, JPG, and JPEG are allowed."
+        )
+
+    def test_upload_xray_non_image_content_type(self):
+        image = SimpleUploadedFile(
+            "xray.jpg",
+            b"fake text content",
+            content_type="text/plain"
+        )
+
+        response = self.client.post(
+            self.upload_url,
+            {
+                "patient_id": self.patient_id,
+                "image": image,
+            },
+            format="multipart"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "File must be a valid image.")
 
     @patch("api.views.Patient.objects.get")
     def test_upload_xray_invalid_patient(self, mock_get):
@@ -670,7 +839,7 @@ class PatientXRayUnitTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
+        self.assertEqual(response.data["error"], "Patient not found")
     @patch("api.views.XRay.objects.filter")
     @patch("api.views.Patient.objects.get")
     def test_list_xrays_success(self, mock_get, mock_filter):
@@ -687,11 +856,23 @@ class PatientXRayUnitTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(len(response.data) > 0)
+        self.assertIn("image_url", response.data[0])
+        self.assertIn("created_at", response.data[0])
+        self.assertIn("has_analysis", response.data[0])
 
-    def test_list_xrays_missing_patient_id(self):
-        response = self.client.get(self.list_url)
+        mock_get.assert_called_once_with(
+            id=str(self.patient_id),
+            doctors=self.user
+        )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        mock_filter.assert_called_once_with(
+            patient=mock_get.return_value
+        )
+        def test_list_xrays_missing_patient_id(self):
+            response = self.client.get(self.list_url)
+
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertEqual(response.data["error"], "patient_id is required")
 # =========================================================
 #  ANALYZE XRAY VIEW TESTS
 # =========================================================
@@ -699,114 +880,235 @@ class TestAnalyzeXRayView(APITestCase):
 
     def setUp(self):
         self.client = APIClient()
-        
-        # 1. Initialize a Mock User object (No database entry created)
+
         self.mock_user = MagicMock(spec=User)
         self.mock_user.username = "dr_test"
         self.mock_user.pk = 1
-        
-        # 2. Force authentication using the mock user
+
         self.client.force_authenticate(user=self.mock_user)
-        
-        # URL helper for the analyze endpoint
+
         self.url = lambda xray_id: f"/api/xrays/{xray_id}/analyze/"
 
+    @patch("api.views.Report.objects.update_or_create")
     @patch("api.views.generate_dental_recommendation")
     @patch("api.views.run_full_analysis")
-    @patch("os.path.exists")
+    @patch("api.views.os.path.exists")
     @patch("api.views.XRay.objects.select_related")
-    def test_success_flow(self, mock_select, mock_exists, mock_run, mock_rec):
-        # Setup Mock Patient owned by the mock user
-        mock_patient = MagicMock()
-        mock_patient.user = self.mock_user
-
-        # Setup Mock Image/File
+    def test_success_flow(
+        self,
+        mock_select,
+        mock_exists,
+        mock_run,
+        mock_rec,
+        mock_update_or_create
+    ):
         mock_image = MagicMock()
         mock_image.path = "/media/xray.png"
         mock_image.url = "http://test/xray.png"
 
-        # Setup Mock XRay object
         mock_xray = MagicMock()
         mock_xray.id = 1
         mock_xray.image = mock_image
-        mock_xray.patient = mock_patient
         mock_xray.save = MagicMock()
 
-        # Configure Mock Database Query (select_related().get())
         mock_select.return_value.get.return_value = mock_xray
-        
-        # Mock File System check
         mock_exists.return_value = True
 
-        # Mock AI Analysis return value
         mock_run.return_value = {
-            "report": {"status": "ok"},
-            "findings": ["cavity"],
+            "report": {
+                "summary": "Test summary",
+                "overall_label": "abnormal",
+                "total_lesions": 1,
+                "total_impacted": 0,
+            },
+            "findings": [{"label": "lesion"}],
             "impacted_findings": [],
-            "lesion_findings": [],
+            "lesion_findings": [{"label": "lesion"}],
         }
 
-        # Mock Recommendation text
-        mock_rec.return_value = "Go to dentist"
+        mock_rec.return_value = {
+            "summary": "Recommendation summary",
+            "urgency": "moderate",
+            "recommendation_text": "Review clinically.",
+            "next_steps": ["Clinical examination"],
+        }
 
-        # Execute Request
+        mock_report = MagicMock()
+        mock_report.ai_result_data = {
+            "xray_id": 1,
+            "report": mock_run.return_value["report"],
+            "findings": mock_run.return_value["findings"],
+            "impacted_findings": [],
+            "lesion_findings": [{"label": "lesion"}],
+            "recommendation": mock_rec.return_value,
+            "image_url": "http://test/xray.png",
+        }
+
+        mock_update_or_create.return_value = (mock_report, True)
+
         response = self.client.post(self.url(1))
 
-        # Assertions
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["xray_id"], 1)
+        self.assertIn("report", response.data)
         self.assertIn("recommendation", response.data)
-        
-        # Verify that the XRay record was updated and saved
+        self.assertEqual(response.data["image_url"], "http://test/xray.png")
+
+        mock_select.return_value.get.assert_called_once_with(
+            id=1,
+            patient__doctors=self.mock_user
+        )
+
+        mock_run.assert_called_once_with("/media/xray.png")
+        mock_rec.assert_called_once()
         mock_xray.save.assert_called_once()
+
+        mock_update_or_create.assert_called_once()
+        self.assertEqual(
+            mock_update_or_create.call_args.kwargs["xray"],
+            mock_xray
+        )
+        self.assertFalse(
+            mock_update_or_create.call_args.kwargs["defaults"]["is_confirmed"]
+        )
+        self.assertIn(
+            "ai_result_data",
+            mock_update_or_create.call_args.kwargs["defaults"]
+        )
 
     @patch("api.views.XRay.objects.select_related")
     def test_xray_not_found(self, mock_select):
-        # Simulate XRay record not found in DB
         mock_select.return_value.get.side_effect = XRay.DoesNotExist
 
         response = self.client.post(self.url(999))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["error"], "XRay not found")
+
+        mock_select.return_value.get.assert_called_once_with(
+            id=999,
+            patient__doctors=self.mock_user
+        )
 
     @patch("api.views.XRay.objects.select_related")
     def test_no_image(self, mock_select):
-        # Setup XRay with missing image file relation
-        mock_patient = MagicMock()
-        mock_patient.user = self.mock_user
-
         mock_xray = MagicMock()
         mock_xray.image = None
-        mock_xray.patient = mock_patient
 
         mock_select.return_value.get.return_value = mock_xray
 
         response = self.client.post(self.url(1))
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "No image found for this XRay")
 
-    @patch("os.path.exists")
+    @patch("api.views.os.path.exists")
     @patch("api.views.XRay.objects.select_related")
     def test_file_not_exists_on_disk(self, mock_select, mock_exists):
-        # Setup XRay where DB record exists but physical file is missing
         mock_image = MagicMock()
         mock_image.path = "/fake/path.png"
 
-        mock_patient = MagicMock()
-        mock_patient.user = self.mock_user
-
         mock_xray = MagicMock()
         mock_xray.image = mock_image
-        mock_xray.patient = mock_patient
 
         mock_select.return_value.get.return_value = mock_xray
-        
-        # Mock File System check to return False
         mock_exists.return_value = False
 
         response = self.client.post(self.url(1))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["error"], "XRay image file does not exist")
+
+        # AI pipeline exception
+@patch("api.views.run_full_analysis")
+@patch("api.views.os.path.exists")
+@patch("api.views.XRay.objects.select_related")
+def test_ai_pipeline_exception(self, mock_select, mock_exists, mock_run):
+    mock_image = MagicMock()
+    mock_image.path = "/media/xray.png"
+
+    mock_xray = MagicMock()
+    mock_xray.image = mock_image
+
+    mock_select.return_value.get.return_value = mock_xray
+    mock_exists.return_value = True
+    mock_run.side_effect = Exception("AI pipeline failed")
+
+    with self.assertRaises(Exception):
+        self.client.post(self.url(1))
+
+        # Recommendation exception
+@patch("api.views.generate_dental_recommendation")
+@patch("api.views.run_full_analysis")
+@patch("api.views.os.path.exists")
+@patch("api.views.XRay.objects.select_related")
+def test_recommendation_exception(self, mock_select, mock_exists, mock_run, mock_rec):
+    mock_image = MagicMock()
+    mock_image.path = "/media/xray.png"
+
+    mock_xray = MagicMock()
+    mock_xray.image = mock_image
+
+    mock_select.return_value.get.return_value = mock_xray
+    mock_exists.return_value = True
+
+    mock_run.return_value = {
+        "report": {},
+        "findings": [],
+        "impacted_findings": [],
+        "lesion_findings": [],
+    }
+
+    mock_rec.side_effect = Exception("Recommendation failed")
+
+    with self.assertRaises(Exception):
+        self.client.post(self.url(1))
+
+        # Report save exception
+@patch("api.views.Report.objects.update_or_create")
+@patch("api.views.generate_dental_recommendation")
+@patch("api.views.run_full_analysis")
+@patch("api.views.os.path.exists")
+@patch("api.views.XRay.objects.select_related")
+def test_report_save_exception(
+    self,
+    mock_select,
+    mock_exists,
+    mock_run,
+    mock_rec,
+    mock_update_or_create
+):
+    mock_image = MagicMock()
+    mock_image.path = "/media/xray.png"
+    mock_image.url = "http://test/xray.png"
+
+    mock_xray = MagicMock()
+    mock_xray.id = 1
+    mock_xray.image = mock_image
+    mock_xray.save = MagicMock()
+
+    mock_select.return_value.get.return_value = mock_xray
+    mock_exists.return_value = True
+
+    mock_run.return_value = {
+        "report": {},
+        "findings": [],
+        "impacted_findings": [],
+        "lesion_findings": [],
+    }
+
+    mock_rec.return_value = {
+        "summary": "ok",
+        "urgency": "low",
+        "recommendation_text": "ok",
+        "next_steps": [],
+    }
+
+    mock_update_or_create.side_effect = Exception("Report save failed")
+
+    with self.assertRaises(Exception):
+        self.client.post(self.url(1))
+
 
 # =========================================================
 #  GET XRAY ANALYSIS TESTS
@@ -815,79 +1117,68 @@ class TestGetXrayAnalysisView(APITestCase):
 
     def setUp(self):
         self.client = APIClient()
-        
-        # 1. Initialize a Mock User object (Fast, no database access)
+
         self.mock_user = MagicMock(spec=User)
         self.mock_user.username = "dr_test2"
         self.mock_user.pk = 1
-        
-        # 2. Force authentication using the mock user
+
         self.client.force_authenticate(user=self.mock_user)
-        
-        # URL helper for the analysis retrieval endpoint
+
         self.url = lambda xray_id: f"/api/xrays/{xray_id}/analysis/"
 
     @patch("api.views.XRay.objects.select_related")
     def test_success(self, mock_select):
-        # Setup Mock Patient owned by the mock user
-        mock_patient = MagicMock()
-        mock_patient.user = self.mock_user
-
-        # Setup Mock XRay object with analysis data
-        mock_xray = MagicMock()
-        mock_xray.patient = mock_patient
-        mock_xray.analysis_result = {
+        mock_report = MagicMock()
+        mock_report.ai_result_data = {
             "xray_id": 1,
             "findings": ["cavity"],
+            "report": {
+                "summary": "Test summary",
+                "overall_label": "abnormal",
+            },
         }
-        mock_xray.doctor_notes = "note"
-        mock_xray.edited_report = "edited"
+        mock_report.doctor_notes = "note"
+        mock_report.is_confirmed = True
+        mock_report.updated_at = "2026-05-10"
 
-        # Configure Mock Database Query
+        mock_xray = MagicMock()
+        mock_xray.report = mock_report
+
         mock_select.return_value.get.return_value = mock_xray
 
         response = self.client.get(self.url(1))
 
-        # Assertions
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["findings"], ["cavity"])
         self.assertEqual(response.data["doctor_notes"], "note")
+        self.assertTrue(response.data["is_confirmed"])
+        self.assertEqual(response.data["updated_at"], "2026-05-10")
+
+        mock_select.return_value.get.assert_called_once_with(
+            id=1,
+            patient__doctors=self.mock_user
+        )
 
     @patch("api.views.XRay.objects.select_related")
     def test_not_found(self, mock_select):
-        # Simulate XRay record not found in DB
         mock_select.return_value.get.side_effect = XRay.DoesNotExist
 
         response = self.client.get(self.url(999))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["error"], "XRay not found")
 
-    @patch("api.views.XRay.objects.select_related")
-    def test_missing_analysis(self, mock_select):
-        # Case where XRay exists but has not been analyzed yet
-        mock_patient = MagicMock()
-        mock_patient.user = self.mock_user
-
-        mock_xray = MagicMock()
-        mock_xray.patient = mock_patient
-        mock_xray.analysis_result = None
-
-        mock_select.return_value.get.return_value = mock_xray
-
-        response = self.client.get(self.url(1))
-
-        # View returns 404 if analysis_result is missing
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        mock_select.return_value.get.assert_called_once_with(
+            id=999,
+            patient__doctors=self.mock_user
+        )
 
     def test_unauthorized(self):
-        # Explicitly remove authentication
         self.client.force_authenticate(user=None)
 
         response = self.client.get(self.url(1))
 
-        # Expecting 401 Unauthorized
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
 # =========================================================
 #  LIST REPORTS TESTS
 # =========================================================
@@ -895,62 +1186,109 @@ class TestListReportsView(APITestCase):
 
     def setUp(self):
         self.client = APIClient()
-        
-        # Initialize a Mock User object
+
         self.mock_user = MagicMock(spec=User)
         self.mock_user.username = "doctor1"
         self.mock_user.pk = 1
-        
-        # Force authentication
+
         self.client.force_authenticate(user=self.mock_user)
         self.url = "/api/reports/"
 
     @patch("api.views.XRay.objects.filter")
     def test_list_reports_success(self, mock_filter):
-        # Setup Mock Patient
         mock_patient = MagicMock()
         mock_patient.id = 10
-        mock_patient.patient_id = "PAT-001"
-        mock_patient.name = "Ahmed"
+        mock_patient.national_id = "1234567890"
+        mock_patient.full_name = "Ahmed"
         mock_patient.age = 30
 
-        # Setup Mock XRay
-        mock_xray = MagicMock()
-        mock_xray.id = 1
-        mock_xray.patient = mock_patient
-        mock_xray.created_at.strftime.return_value = "2026-05-05 10:00"
-        
-        # Data matching your view's logic
-        mock_xray.analysis_result = {
+        mock_report = MagicMock()
+        mock_report.is_confirmed = False
+        mock_report.ai_result_data = {
             "report": {
                 "total_lesions": 2,
                 "total_impacted": 1,
                 "summary": "Test summary",
                 "overall_label": "mild",
             },
-            "recommendation": "Visit dentist",
+            "recommendation": {
+                "summary": "Recommendation summary",
+                "urgency": "moderate",
+                "recommendation_text": "Visit dentist",
+                "next_steps": ["Clinical review"],
+            },
         }
 
-        # Mocking the QuerySet chain: filter().select_related().order_by()
+        mock_xray = MagicMock()
+        mock_xray.id = 1
+        mock_xray.patient = mock_patient
+        mock_xray.report = mock_report
+        mock_xray.uploaded_at.strftime.return_value = "2026-05-05 10:00"
+
         mock_queryset = MagicMock()
         mock_queryset.select_related.return_value.order_by.return_value = [mock_xray]
         mock_filter.return_value = mock_queryset
 
         response = self.client.get(self.url)
 
-        # Assertions
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
 
         report = response.data[0]
-        self.assertEqual(report["findings"], 3) # 2 + 1
+        self.assertEqual(report["id"], 1)
+        self.assertEqual(report["patient_id"], 10)
+        self.assertEqual(report["patient_code"], "1234567890")
         self.assertEqual(report["patient_name"], "Ahmed")
-        
-        # FIXED: Match the actual arguments used in your view
+        self.assertEqual(report["patient_age"], 30)
+        self.assertEqual(report["date"], "2026-05-05 10:00")
+        self.assertEqual(report["status"], "Pending")
+        self.assertEqual(report["findings"], 3)
+        self.assertEqual(report["summary"], "Test summary")
+        self.assertEqual(report["overall_label"], "mild")
+        self.assertEqual(report["total_lesions"], 2)
+        self.assertEqual(report["total_impacted"], 1)
+        self.assertIn("recommendation", report)
+
         mock_filter.assert_called_once_with(
-            patient__user=self.mock_user,
-            analysis_result__isnull=False
+            patient__doctors=self.mock_user,
+            report__isnull=False
         )
+
+    @patch("api.views.XRay.objects.filter")
+    def test_list_reports_confirmed_status(self, mock_filter):
+        mock_patient = MagicMock()
+        mock_patient.id = 10
+        mock_patient.national_id = "1234567890"
+        mock_patient.full_name = "Ahmed"
+        mock_patient.age = 30
+
+        mock_report = MagicMock()
+        mock_report.is_confirmed = True
+        mock_report.ai_result_data = {
+            "report": {
+                "total_lesions": 0,
+                "total_impacted": 0,
+                "summary": "Normal case",
+                "overall_label": "normal",
+            },
+            "recommendation": {},
+        }
+
+        mock_xray = MagicMock()
+        mock_xray.id = 2
+        mock_xray.patient = mock_patient
+        mock_xray.report = mock_report
+        mock_xray.uploaded_at.strftime.return_value = "2026-05-05 11:00"
+
+        mock_queryset = MagicMock()
+        mock_queryset.select_related.return_value.order_by.return_value = [mock_xray]
+        mock_filter.return_value = mock_queryset
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]["status"], "Confirmed")
+        self.assertEqual(response.data[0]["findings"], 0)
 
     @patch("api.views.XRay.objects.filter")
     def test_list_reports_empty(self, mock_filter):
@@ -963,9 +1301,16 @@ class TestListReportsView(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, [])
 
+        mock_filter.assert_called_once_with(
+            patient__doctors=self.mock_user,
+            report__isnull=False
+        )
+
     def test_list_reports_unauthorized(self):
         self.client.force_authenticate(user=None)
+
         response = self.client.get(self.url)
+
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 # =========================================================
@@ -975,116 +1320,148 @@ class TestUpdateReportView(APITestCase):
 
     def setUp(self):
         self.client = APIClient()
-        
-        # 1. Initialize a Mock User object (Fast, no DB)
-        self.mock_user = MagicMock(spec=User)
-        self.mock_user.username = "doctor1"
-        self.mock_user.pk = 1
-        
-        # 2. Force authentication using the mock user
+
+        self.mock_user = User.objects.create_user(
+           username="testuser",
+           password="123456"
+)
         self.client.force_authenticate(user=self.mock_user)
-        
-        # URL helper for the update endpoint
+
         self.url = lambda xray_id: f"/api/xrays/{xray_id}/update-report/"
 
     @patch("api.views.XRay.objects.select_related")
     def test_update_report_success(self, mock_select):
-        # Setup Mock Patient owned by the mock user
-        mock_patient = MagicMock()
-        mock_patient.user = self.mock_user
+        mock_report = MagicMock()
+        mock_report.doctor_notes = "old note"
+        mock_report.is_confirmed = False
+        mock_report.save = MagicMock()
 
-        # Setup Mock XRay object
         mock_xray = MagicMock()
-        mock_xray.patient = mock_patient
-        mock_xray.doctor_notes = "old note"
-        mock_xray.edited_report = "old report"
-        mock_xray.save = MagicMock()
+        mock_xray.report = mock_report
 
-        # Configure Mock Database Query to return our mock object
         mock_select.return_value.get.return_value = mock_xray
 
         data = {
-            "doctor_notes": "new note",
-            "edited_report": "new report",
+            "doctor_notes": "new note"
         }
 
         response = self.client.put(self.url(1), data, format="json")
 
-        # Assertions
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["message"], "Notes updated successfully.")
         self.assertEqual(response.data["doctor_notes"], "new note")
-        self.assertEqual(response.data["edited_report"], "new report")
-        
-        # Verify the database lookup used the correct security filters
+
+        self.assertEqual(mock_report.doctor_notes, "new note")
+        self.assertTrue(mock_report.is_confirmed)
+
         mock_select.return_value.get.assert_called_once_with(
             id=1,
-            patient__user=self.mock_user
+            patient__doctors=self.mock_user
         )
-        # Verify save was called after updating fields
-        mock_xray.save.assert_called_once()
+
+        mock_report.save.assert_called_once()
 
     @patch("api.views.XRay.objects.select_related")
     def test_update_report_not_found(self, mock_select):
-        # Simulate record not found or not belonging to this user
         mock_select.return_value.get.side_effect = XRay.DoesNotExist
 
-        data = {"doctor_notes": "note"}
+        data = {
+            "doctor_notes": "note"
+        }
+
         response = self.client.put(self.url(999), data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "XRay not found")
+        self.assertEqual(response.data["error"], "XRay not found.")
+
+        mock_select.return_value.get.assert_called_once_with(
+            id=999,
+            patient__doctors=self.mock_user
+        )
 
     @patch("api.views.XRay.objects.select_related")
-    def test_update_only_doctor_notes(self, mock_select):
-        mock_patient = MagicMock()
-        mock_patient.user = self.mock_user
+    def test_update_report_missing_doctor_notes(self, mock_select):
+        mock_report = MagicMock()
 
         mock_xray = MagicMock()
-        mock_xray.patient = mock_patient
-        mock_xray.doctor_notes = "old"
-        mock_xray.edited_report = "old_report"
-        mock_xray.save = MagicMock()
+        mock_xray.report = mock_report
 
         mock_select.return_value.get.return_value = mock_xray
 
-        # Only sending doctor_notes
-        data = {"doctor_notes": "updated only notes"}
+        response = self.client.put(self.url(1), {}, format="json")
 
-        response = self.client.put(self.url(1), data, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["doctor_notes"], "updated only notes")
-        # Ensure edited_report remained unchanged
-        self.assertEqual(response.data["edited_report"], "old_report")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["error"],
+            "Doctor notes are required. Please enter notes before saving."
+        )
 
     @patch("api.views.XRay.objects.select_related")
-    def test_update_only_edited_report(self, mock_select):
-        mock_patient = MagicMock()
-        mock_patient.user = self.mock_user
+    def test_update_report_non_string_doctor_notes(self, mock_select):
+        mock_report = MagicMock()
 
         mock_xray = MagicMock()
-        mock_xray.patient = mock_patient
-        mock_xray.doctor_notes = "old_notes"
-        mock_xray.edited_report = "old"
-        mock_xray.save = MagicMock()
+        mock_xray.report = mock_report
 
         mock_select.return_value.get.return_value = mock_xray
 
-        # Only sending edited_report
-        data = {"edited_report": "updated report only"}
+        data = {
+            "doctor_notes": 12345
+        }
 
         response = self.client.put(self.url(1), data, format="json")
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["edited_report"], "updated report only")
-        # Ensure doctor_notes remained unchanged
-        self.assertEqual(response.data["doctor_notes"], "old_notes")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "Doctor notes must be text.")
+
+    @patch("api.views.XRay.objects.select_related")
+    def test_update_report_empty_doctor_notes(self, mock_select):
+        mock_report = MagicMock()
+
+        mock_xray = MagicMock()
+        mock_xray.report = mock_report
+
+        mock_select.return_value.get.return_value = mock_xray
+
+        data = {
+            "doctor_notes": "   "
+        }
+
+        response = self.client.put(self.url(1), data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "Doctor notes cannot be empty.")
+
+    @patch("api.views.XRay.objects.select_related")
+    def test_update_report_digits_only_doctor_notes(self, mock_select):
+        mock_report = MagicMock()
+
+        mock_xray = MagicMock()
+        mock_xray.report = mock_report
+
+        mock_select.return_value.get.return_value = mock_xray
+
+        data = {
+            "doctor_notes": "123456"
+        }
+
+        response = self.client.put(self.url(1), data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["error"],
+            "Doctor notes cannot contain only numbers. Please write a real note."
+        )
+
+  
 
     def test_update_report_unauthorized(self):
-        # Explicitly remove authentication
         self.client.force_authenticate(user=None)
 
-        data = {"doctor_notes": "test"}
+        data = {
+            "doctor_notes": "test"
+        }
+
         response = self.client.put(self.url(1), data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

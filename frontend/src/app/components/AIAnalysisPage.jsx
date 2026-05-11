@@ -21,7 +21,10 @@ export function AIAnalysisPage({
   const [isSavingNotes, setIsSavingNotes] = useState(false);
 
   const imgRef = useRef(null);
+  const [notesMessage, setNotesMessage] = useState("");
+  const [notesError, setNotesError] = useState(false);
   const [imageSize, setImageSize] = useState({
+
     naturalWidth: 1,
     naturalHeight: 1,
     displayWidth: 1,
@@ -83,6 +86,7 @@ export function AIAnalysisPage({
       console.error("Error fetching patient name:", err);
     }
   };
+  
   const handleSaveNotes = async () => {
     setIsSavingNotes(true);
 
@@ -102,34 +106,55 @@ export function AIAnalysisPage({
       );
 
       if (response.ok) {
-        alert("Doctor notes saved successfully");
+        setNotesMessage("Doctor notes saved successfully");
+        setNotesError(false);
       } else {
-        alert("Failed to save doctor notes");
+        setNotesMessage("Doctor notes must contain text only. Numbers are not allowed.");
+        setNotesError(true);
       }
+
     } catch (err) {
       console.error("Error saving notes:", err);
-      alert("Server error while saving notes");
+
+      setNotesMessage("Server error while saving notes");
+      setNotesError(true);
+
     } finally {
       setIsSavingNotes(false);
     }
   };
+
   const handleDownloadPDF = async () => {
+
     document.documentElement.classList.add("pdf-mode");
+
     const element = document.querySelector(".report-card");
 
     const options = {
-      margin: 0.4,
+      margin: 0,
+
       filename: `AI_Report_${Date.now()}.pdf`,
-      image: { type: "jpeg", quality: 0.98 },
+
+      image: {
+        type: "jpeg",
+        quality: 1,
+      },
+
       html2canvas: {
         scale: 2,
         useCORS: true,
+        scrollY: 0,
         backgroundColor: "#ffffff",
       },
+
       jsPDF: {
-        unit: "in",
-        format: "a4",
+        unit: "px",
+        format: [element.scrollWidth, element.scrollHeight],
         orientation: "portrait",
+      },
+
+      pagebreak: {
+        mode: ["avoid-all"],
       },
     };
 
@@ -331,7 +356,7 @@ export function AIAnalysisPage({
           </section>
 
           <section className="summary-section">
-            <h2 className="image-section-title">Summary</h2>
+            <h2 className="report-text">Summary</h2>
 
             <div className="legend">
               <div className="legend-item">
@@ -380,7 +405,7 @@ export function AIAnalysisPage({
 
           {recommendation && Object.keys(recommendation).length > 0 && (
             <section className="recommendation-section">
-              <h2 className="image-section-title">Recommendation</h2>
+              <h2 className="report-text">Recommendation</h2>
 
               <div className="recommendation-card">
                 <div className="recommendation-header">
@@ -415,9 +440,8 @@ export function AIAnalysisPage({
               </div>
             </section>
           )}
-
           <section className="doctor-notes-section">
-            <h2 className="image-section-title">Doctor Notes</h2>
+            <h2 className="report-text">Doctor Notes</h2>
 
             <div className="notes-container">
               <textarea
@@ -427,7 +451,13 @@ export function AIAnalysisPage({
                 className="doctor-notes-textarea"
               />
 
-              <div className="notes-actions">
+              {notesMessage && (
+                <p className={`notes-message ${notesError ? "error" : "success"}`}>
+                  {notesMessage}
+                </p>
+              )}
+
+              <div className="notes-actions print-hidden">
                 <button
                   onClick={handleSaveNotes}
                   disabled={isSavingNotes}
@@ -437,10 +467,9 @@ export function AIAnalysisPage({
                 </button>
               </div>
             </div>
-
           </section>
 
-          <div
+                   <div
             className="print-hidden"
             style={{
               display: "flex",
@@ -456,6 +485,7 @@ export function AIAnalysisPage({
               <span>Download PDF Report</span>
             </button>
           </div>
+
         </div>
       </div>
     </div>

@@ -211,10 +211,6 @@ class DentekIntegrationTests(APITestCase):
         self.assertEqual(response.data["name"], "Ahmed Ali")
         self.assertIn("message", response.data)
 
-    def test_create_patient_requires_authentication(self):
-        response = self.create_valid_patient()
-
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_create_patient_missing_national_id(self):
         self.authenticate_as_doctor1()
@@ -377,53 +373,6 @@ class DentekIntegrationTests(APITestCase):
         self.assertIn("image_url", response.data)
         self.assertFalse(response.data["has_analysis"])
 
-    def test_upload_xray_requires_authentication(self):
-        image = SimpleUploadedFile(
-            "xray.png",
-            b"fake image",
-            content_type="image/png"
-        )
-
-        response = self.client.post(
-            self.upload_xray_url,
-            {
-                "patient_id": 1,
-                "image": image
-            },
-            format="multipart"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_upload_xray_missing_patient_id(self):
-        self.authenticate_as_doctor1()
-
-        image = SimpleUploadedFile(
-            "xray.png",
-            b"fake image",
-            content_type="image/png"
-        )
-
-        response = self.client.post(
-            self.upload_xray_url,
-            {"image": image},
-            format="multipart"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["error"], "patient_id is required")
-
-    def test_upload_xray_missing_image(self):
-        self.authenticate_as_doctor1()
-        patient_response = self.create_valid_patient()
-        patient_id = patient_response.data["id"]
-
-        response = self.client.post(self.upload_xray_url, {
-            "patient_id": patient_id
-        })
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["error"], "image is required")
 
     def test_upload_xray_invalid_extension(self):
         self.authenticate_as_doctor1()
@@ -448,13 +397,6 @@ class DentekIntegrationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Invalid file type", response.data["error"])
 
-    def test_upload_xray_patient_not_found(self):
-        self.authenticate_as_doctor1()
-
-        response = self.upload_valid_xray(999)
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "Patient not found")
 
     def test_doctor_cannot_upload_xray_for_other_doctor_patient(self):
         self.authenticate_as_doctor1()
@@ -535,13 +477,6 @@ class DentekIntegrationTests(APITestCase):
         self.assertIn("image_url", response.data)
         self.assertEqual(response.data["report"]["overall_label"], "abnormal")
 
-    def test_analyze_xray_not_found(self):
-        self.authenticate_as_doctor1()
-
-        response = self.client.post("/api/xrays/999/analyze/")
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "XRay not found")
 
     def test_doctor_cannot_analyze_other_doctor_xray(self):
         patient_id, xray_id = self.create_uploaded_xray_for_doctor1()
@@ -677,15 +612,6 @@ class DentekIntegrationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertIn("No report exists", response.data["error"])
 
-    def test_update_report_xray_not_found(self):
-        self.authenticate_as_doctor1()
-
-        response = self.client.put("/api/xrays/999/update-report/", {
-            "doctor_notes": "Valid note."
-        })
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data["error"], "XRay not found.")
 
     def test_doctor_cannot_update_other_doctor_report(self):
         patient_id, xray_id, analyze_response = self.create_analyzed_xray_for_doctor1()

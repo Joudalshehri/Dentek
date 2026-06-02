@@ -1,6 +1,6 @@
 /* PatientsHeader.css */
 
-/* الحاوية الرئيسية للهيدر */
+
 .patients-header-container {
     display: flex;
     justify-content: space-between;
@@ -13,7 +13,7 @@
     margin-right: 2rem;
 }
 
-/* تنسيق النصوص */
+
 .header-text-group h1 {
     font-size: 2.5rem; /* Equivalent to text-4xl */
     margin: 0 0 0.5rem 0;
@@ -25,14 +25,14 @@
     font-size: 1rem;
 }
 
-/* الألوان بناءً على الثيم */
+
 .header-text-group.light h1 { color: #1f2937; } /* gray-800 */
 .header-text-group.dark h1 { color: #ffffff; }
 
 .header-text-group.light p { color: #4b5563; } /* gray-600 */
 .header-text-group.dark p { color: #9ca3af; } /* gray-400 */
 
-/* زر إضافة مريض */
+
 .add-patient-btn {
     display: flex;
     align-items: center;
@@ -56,7 +56,7 @@
     transform: translateY(0);
 }
 
-/* تدرج الألوان الخاص بـ Dentek */
+
 .add-patient-btn.light {
     background: linear-gradient(to right, #3d5a54, #4a6860);
 }

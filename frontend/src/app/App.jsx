@@ -12,68 +12,111 @@ import { ForgotPasswordPage } from '@/app/components/ForgotPasswordPage';
 
 export default function App() {
 
+  // ================= GLOBAL APP STATE =================
+
+  // Tracks which page is currently displayed
   const [currentPage, setCurrentPage] = useState('landing');
+
+  // Stores selected patient ID
   const [selectedPatientId, setSelectedPatientId] = useState(null);
+
+  // Stores selected X-ray ID
   const [selectedXrayId, setSelectedXrayId] = useState(null);
+
+  // Stores AI analysis result data
   const [analysisData, setAnalysisData] = useState(null);
+
+  // Tracks which page opened the AI analysis page
   const [sourcePage, setSourcePage] = useState('patient-details');
 
-  // ✅ أهم شيء: البروفايل العالمي (shared state)
+  // Shared profile state across the whole application
   const [profile, setProfile] = useState({
     username: '',
     email: ''
   });
 
-  // ✅ جلب البروفايل مرة واحدة عند تشغيل التطبيق
+  // ================= FETCH USER PROFILE =================
+
+  // Fetch profile when app loads or page changes
   useEffect(() => {
-  const fetchProfile = async () => {
-    try {
-      const res = await fetch('http://127.0.0.1:8000/api/profile/', {
-        headers: {
-          Authorization: `Token ${localStorage.getItem("token")}`,
-        },
-      });
 
-      if (!res.ok) return;
+    const fetchProfile = async () => {
 
-      const data = await res.json();
+      try {
 
-      setProfile({
-        username: data.username || '',
-        email: data.email || '',
-      });
+        // Request profile data from backend
+        const res = await fetch(
+          'http://127.0.0.1:8000/api/profile/',
+          {
+            headers: {
+              Authorization: `Token ${localStorage.getItem("token")}`,
+            },
+          }
+        );
 
-    } catch (err) {
-      console.error(err);
+        // Stop if request failed
+        if (!res.ok) return;
+
+        // Convert response to JSON
+        const data = await res.json();
+
+        // Update shared profile state
+        setProfile({
+          username: data.username || '',
+          email: data.email || '',
+        });
+
+      } catch (err) {
+
+        // Log connection/server errors
+        console.error(err);
+      }
+    };
+
+    // Fetch profile only if token exists
+    if (localStorage.getItem("token")) {
+      fetchProfile();
     }
-  };
 
-  // 🔥 مهم: لا تجيبي profile إلا لو فيه token
-  if (localStorage.getItem("token")) {
-    fetchProfile();
-  }
+  }, [currentPage]);
 
-}, [currentPage]); // أو [] لو تبينه مرة واحدة فقط
+  // ================= NAVIGATION FUNCTIONS =================
 
-  // ================= NAVIGATION =================
-
+  // Open selected patient details page
   const handleSelectPatient = (patientId) => {
+
     setSelectedPatientId(patientId);
+
+    // Save selected patient in local storage
     localStorage.setItem('selectedPatientId', patientId);
+
+    // Navigate to patient details page
     setCurrentPage('patient-details');
   };
 
+  // Open AI analysis page for selected X-ray
   const handleAnalyzeXray = (xrayId) => {
+
     setSelectedXrayId(xrayId);
+
+    // Clear old analysis data
     setAnalysisData(null);
+
+    // Save source page
     setSourcePage('patient-details');
+
+    // Navigate to AI analysis page
     setCurrentPage('ai-analysis');
   };
 
+  // Open report details and AI analysis
   const handleViewReport = async (reportId) => {
+
     try {
+
       const token = localStorage.getItem("token");
 
+      // Fetch AI analysis result
       const response = await fetch(
         `http://127.0.0.1:8000/api/xrays/${reportId}/analysis/`,
         {
@@ -85,76 +128,123 @@ export default function App() {
 
       const data = await response.json();
 
-      const reportsResponse = await fetch("http://127.0.0.1:8000/api/reports/", {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
+      // Fetch reports list
+      const reportsResponse = await fetch(
+        "http://127.0.0.1:8000/api/reports/",
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
 
       const reports = await reportsResponse.json();
 
+      // Find selected report
       const selectedReport = reports.find(
         (r) => String(r.id) === String(reportId)
       );
 
+      // Save patient ID related to selected report
       if (selectedReport) {
-        setSelectedPatientId(String(selectedReport.patient_id));
-        localStorage.setItem("selectedPatientId", selectedReport.patient_id);
+
+        setSelectedPatientId(
+          String(selectedReport.patient_id)
+        );
+
+        localStorage.setItem(
+          "selectedPatientId",
+          selectedReport.patient_id
+        );
       }
 
+      // Save analysis data
       setAnalysisData(data);
+
+      // Save selected X-ray ID
       setSelectedXrayId(reportId);
+
+      // Track source page
       setSourcePage("reports");
+
+      // Navigate to analysis page
       setCurrentPage("ai-analysis");
 
     } catch (error) {
+
+      // Log unexpected errors
       console.error(error);
     }
   };
 
+  // Return from patient details page to patients page
   const handleBackToPatients = () => {
+
     setCurrentPage('patients');
+
     setSelectedPatientId(null);
     setSelectedXrayId(null);
     setAnalysisData(null);
   };
 
+  // Return from AI analysis page
   const handleBackFromAnalysis = () => {
+
+    // Return to reports page if opened from reports
     if (sourcePage === 'reports') {
+
       setCurrentPage('reports');
+
     } else {
+
+      // Otherwise return to patient details
       setCurrentPage('patient-details');
     }
+
+    // Clear selected X-ray
     setSelectedXrayId(null);
   };
 
+  // Main sidebar/page navigation
   const handleNavigateMain = (page) => {
     setCurrentPage(page);
   };
 
+  // Logout user and clear all saved state
   const handleLogout = () => {
+
+    // Navigate back to landing page
     setCurrentPage('landing');
+
+    // Clear all selected data
     setSelectedPatientId(null);
     setSelectedXrayId(null);
     setAnalysisData(null);
 
+    // Reset profile state
     setProfile({
       username: '',
       email: ''
     });
 
+    // Remove all saved local storage data
     localStorage.clear();
   };
 
-  // ================= RENDER =================
+  // ================= UI RENDERING =================
 
   return (
+
     <DarkModeProvider>
 
+      {/* Landing Page */}
       {currentPage === 'landing' && (
-        <LandingPage onNavigateToLogin={() => setCurrentPage('login')} />
+        <LandingPage
+          onNavigateToLogin={() => setCurrentPage('login')}
+        />
       )}
 
+      {/* Login Page */}
       {currentPage === 'login' && (
         <LoginPage
           onNavigateToLanding={() => setCurrentPage('landing')}
@@ -163,12 +253,14 @@ export default function App() {
         />
       )}
 
+      {/* Forgot Password Page */}
       {currentPage === 'forgot-password' && (
         <ForgotPasswordPage
           onBackToLogin={() => setCurrentPage('login')}
         />
       )}
 
+      {/* Patient Details Page */}
       {currentPage === 'patient-details' && selectedPatientId && (
         <PatientDetailsPage
           patientId={selectedPatientId}
@@ -177,19 +269,26 @@ export default function App() {
         />
       )}
 
-      {currentPage === 'ai-analysis' && selectedXrayId && selectedPatientId && (
+      {/* AI Analysis Page */}
+      {currentPage === 'ai-analysis' &&
+        selectedXrayId &&
+        selectedPatientId && (
+
         <AIAnalysisPage
           xrayId={selectedXrayId}
           patientId={selectedPatientId}
           onBack={handleBackFromAnalysis}
           analysisData={analysisData}
-          backText={sourcePage === 'reports'
-            ? "Back to Reports Page"
-            : "Back to Patient Details"
+
+          backText={
+            sourcePage === 'reports'
+              ? "Back to Reports Page"
+              : "Back to Patient Details"
           }
         />
       )}
 
+      {/* Main Pages Layout */}
       {(currentPage === 'patients' ||
         currentPage === 'reports' ||
         currentPage === 'settings') && (
@@ -201,20 +300,29 @@ export default function App() {
           profile={profile}
           setProfile={setProfile}
         >
+
+          {/* Patients Page */}
           {currentPage === 'patients' && (
-            <PatientsPage onSelectPatient={handleSelectPatient} />
+            <PatientsPage
+              onSelectPatient={handleSelectPatient}
+            />
           )}
 
+          {/* Reports Page */}
           {currentPage === 'reports' && (
-            <ReportsPage onViewReport={handleViewReport} />
+            <ReportsPage
+              onViewReport={handleViewReport}
+            />
           )}
 
+          {/* Settings Page */}
           {currentPage === 'settings' && (
             <SettingsPage
               profile={profile}
               setProfile={setProfile}
             />
           )}
+
         </MainLayout>
       )}
 

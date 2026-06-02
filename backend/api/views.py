@@ -15,6 +15,7 @@ import re
 from datetime import date
 from django.db import IntegrityError, DatabaseError
 from django.utils.dateparse import parse_date
+import numpy as np 
 
 import json
 from groq import Groq
@@ -104,30 +105,17 @@ def create_patient(request):
     Creates a new patient record.
     Performs manual validation and returns field-specific error messages.
     """
-
     data = request.data
     errors = {}
 
     # Extract and clean data
-    patient_code = (
-        data.get("patient_id")
-        or data.get("national_id")
-        or ""
-    ).strip()
+    patient_code = ( data.get("patient_id") or data.get("national_id")   or "" ).strip()
 
-    full_name = (
-        data.get("name")
-        or data.get("full_name")
-        or ""
-    ).strip()
+    full_name = ( data.get("name")or data.get("full_name")or "" ).strip()
 
     birth_date = data.get("birth_date") or data.get("birthDate")
 
-    phone = (
-        data.get("phone")
-        or data.get("phone_number")
-        or ""
-    ).strip()
+    phone = (data.get("phone")or data.get("phone_number") or "").strip()
 
     email = data.get("email", "").strip()
 
@@ -283,7 +271,6 @@ def upload_xray(request):
     """
     Upload a new X-ray image for a specific patient.
     """
-
     # Get patient ID and uploaded image from the request
     patient_id = request.data.get("patient_id")
     image = request.FILES.get("image")
@@ -389,7 +376,6 @@ def analyze_xray_view(request, xray_id):
     """
     Run AI analysis on a selected X-ray image.
     """
-
     try:
         xray = XRay.objects.select_related("patient").get(
             id=xray_id,
@@ -486,11 +472,7 @@ def get_xray_analysis(request, xray_id):
     return Response(data, status=200)
 
 def make_json_safe(obj):
-    try:
-       import numpy as np 
-    except ImportError:
-        np = None
-
+    
     if isinstance(obj, dict):
         return {str(k): make_json_safe(v) for k, v in obj.items()}
 
@@ -525,17 +507,17 @@ def clean_json_text(text):
 
     text = text.strip()
 
-    # إزالة ```json أو ```JSON أو ```json\n
+    # remove ```json ```JSON ```json\n
     if text.lower().startswith("```json"):
         text = text[7:].strip()
     elif text.startswith("```"):
         text = text[3:].strip()
 
-    # إزالة أي كلمة json في البداية (حتى لو لحالها أو مع newline)
+    
     if text.lower().startswith("json"):
         text = text[4:].strip()
 
-    # إزالة ``` في النهاية
+   
     if text.endswith("```"):
         text = text[:-3].strip()
 
@@ -694,9 +676,6 @@ def list_reports(request):
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def update_report(request, xray_id):
-    """
-    Update doctor notes for a specific report.
-    """
 
     try:
         # Validate xray_id
@@ -813,22 +792,21 @@ def update_profile_view(request):
     # Ensure the username is not empty or composed solely of whitespace
     if not username:
         errors["username"] = "Username is required"
+    elif username.isdigit():
+        errors["username"] = "Username cannot be numbers only"
 
     # --- Email Validation (Mirrors Frontend Logic) ---
     if not email:
         errors["email"] = "Email address is required"
     else:
         # Check for basic structure: existence of '@' and '.'
-        if "@" not in email or "." not in email:
+        if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
             errors["email"] = "Please enter a complete email (e.g., example@domain.com)"
         
         # Ensure the last dot occurs after the '@' symbol
         elif email.rfind(".") < email.find("@"):
             errors["email"] = "Invalid email structure"
             
-        # Regex check for standard email format validation
-        elif not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
-            errors["email"] = "Email domain is incomplete or invalid"
 
     # --- Response Handling ---
     # If validation dictionary is not empty, return a 400 Bad Request

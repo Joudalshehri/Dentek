@@ -11,7 +11,7 @@
     transition: all 0.3s ease;
 }
 
-/* سمات الثيمات (Light/Dark) للخلفية */
+
 .modal-overlay.light { background-color: rgba(213, 221, 223, 0.6); }
 .modal-overlay.dark { background-color: rgba(26, 31, 46, 0.7); }
 

@@ -1,25 +1,25 @@
 /* PatientsPage.css */
 
 .patients-container {
-  /* تحديد الحد الأقصى للعرض ليكون المحتوى في المنتصف */
+  
   max-width: 1200px; 
-  /* auto من اليمين واليسار هي السر في التوسيط وإضافة المساحات الجانبية */
+  
   margin: 0 auto; 
   display: flex;
   flex-direction: column;
-  gap: 32px; /* زيادة المسافة الرأسية بين البحث والمربعات والجدول */
-  padding: 0 40px; /* إضافة مسافة أمان جانبية داخلية */
+  gap: 32px; 
+  padding: 0 40px; 
 }
 
-/* تعديل بسيط للهيدر عشان يتماشى مع المساحات الجديدة */
+
 .patients-page h1, 
 .patients-page p {
-  padding-left: 0; /* تأكد أنها تتبع محاذاة الكانتينر الجديد */
+  padding-left: 0; 
 }
 
 @media (max-width: 768px) {
   .patients-container {
-    padding: 0 20px; /* مساحة أصغر للجوال */
+    padding: 0 20px; 
     max-width: 100%;
   }
 }

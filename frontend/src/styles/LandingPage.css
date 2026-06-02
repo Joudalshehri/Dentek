@@ -295,8 +295,7 @@
 
 .light-mode .dot-active { background-color: #3d5a54; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .dark-mode .dot-active { background-color: #6fa86f; }
-/* الحاوية الأساسية للفوتر */
-/* الحاوية الأساسية للفوتر */
+
 .footer {
     width: 100%;
     max-width: 80rem;
@@ -308,11 +307,9 @@
     box-sizing: border-box; 
 }
 
-/* الألوان حسب وضع الإضاءة */
 .light-mode .footer { border-color: rgba(209, 213, 219, 0.5); }
 .dark-mode .footer { border-color: #374151; }
 
-/* توزيع المحتوى الداخلي */
 .footer-content {
     display: flex;
     justify-content: space-between;
@@ -322,7 +319,7 @@
     gap: 2rem;
 }
 
-/* القسم الأيسر: الشعار والحقوق */
+
 .footer-left {
     display: flex;
     align-items: center;
@@ -338,18 +335,18 @@
     white-space: nowrap;
 }
 
-/* قسم الروابط الأساسية: لجعلها كلها على مستوى واحد */
+
 .footer-links {
     display: flex;
-    align-items: flex-start; /* يضمن أن الكلمات الثلاث على نفس الخط */
+    align-items: flex-start; 
     gap: 3rem; 
     margin-left: auto;
 }
 
-/* تنسيق الكلمات والروابط */
+
 .footer-link, .footer-title {
     font-size: 0.875rem;
-    font-weight: 600; /* جعل الكلمات الأساسية بارزة وبنفس الوزن */
+    font-weight: 600; 
     text-decoration: none;
     background: none;
     border: none;
@@ -358,26 +355,26 @@
     transition: color 0.3s ease;
 }
 
-/* تنظيم قسم التواصل لينزل تحت كلمة Contact */
+
 .footer-contact {
     display: flex;
     flex-direction: column;
     gap: 0.8rem;
 }
 
-/* تنسيق الروابط الفرعية (الإيميل وتويتر) */
+
 .footer-contact .footer-link {
-    font-weight: 400; /* جعل الإيميل وتويتر بوزن أخف لتمييزهم عن العناوين */
+    font-weight: 400; 
     font-size: 0.85rem;
 }
 
-/* العناوين الأساسية */
+
 .footer-title {
     margin: 0;
     cursor: default;
 }
 
-/* ألوان النصوص */
+
 .light-mode .footer-copy, 
 .light-mode .footer-link,
 .light-mode .footer-title { 
@@ -390,11 +387,11 @@
     color: #9ca3af; 
 }
 
-/* تأثير الـ Hover */
+
 .light-mode .footer-link:hover { color: #3d5a54; }
 .dark-mode .footer-link:hover { color: #6fa86f; }
 
-/* التجاوب مع الجوال */
+
 @media (max-width: 768px) {
     .footer-content {
         flex-direction: column;
@@ -406,7 +403,7 @@
     }
 }
 
-/* تنظيم قسم التواصل ليكون عمودياً */
+
 .footer-contact {
     display: flex;
     flex-direction: column;
@@ -417,11 +414,11 @@
     font-weight: 600;
     font-size: 0.875rem;
     margin: 0;
-    text-transform: uppercase; /* لمسة اختيارية لجعل العنوان بارزاً */
+    text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
-/* ألوان النصوص حسب الوضع (Light/Dark) */
+
 .light-mode .footer-copy, 
 .light-mode .footer-link,
 .light-mode .footer-title { 
@@ -434,11 +431,11 @@
     color: #9ca3af; 
 }
 
-/* تأثير الـ Hover */
+
 .light-mode .footer-link:hover { color: #3d5a54; }
 .dark-mode .footer-link:hover { color: #6fa86f; }
 
-/* التجاوب مع شاشات الجوال */
+
 @media (max-width: 768px) {
     .footer-content {
         flex-direction: column;
